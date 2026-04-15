@@ -1,6 +1,6 @@
 # TDDD27_2026
 
-# 🍺 Ölkartan
+# Ölkartan
 
 ## Om projektet
 Ölkartan är en webbapplikation där användare kan rapportera och se aktuella ölpriser i Norrköping.  
@@ -11,7 +11,6 @@ Fokus ligger på:
 - Historik  
 - Tydlig datainmatning  
 
----
 
 ## Funktionalitet
 
@@ -41,8 +40,6 @@ Användaren kan filtrera innehållet, till exempel efter:
 - Pris per liter  
 - Studentrabatt  
 
----
-
 ## Teknologi
 
 **Frontend**
@@ -54,7 +51,6 @@ Användaren kan filtrera innehållet, till exempel efter:
 **Backend**
 - Supabase eller Firebase  
 
----
 
 ## Datamodell
 
@@ -68,13 +64,11 @@ Varje rapport:
 - beskriver ett specifikt tillfälle  
 - kan markeras som felaktig  
 
----
 
 ## Realtid
 
 Systemet synkroniserar data mellan användare så att ändringar visas direkt i gränssnittet.
 
----
 
 ## Användarflöde
 
