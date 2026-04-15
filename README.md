@@ -1,5 +1,87 @@
 # TDDD27_2026
 
+# 🍺 Ölkartan
+
+## Om projektet
+Ölkartan är en webbapplikation där användare kan rapportera och se aktuella ölpriser i Norrköping.  
+Systemet bygger på att användare själva lägger in information, vilket gör att datan hålls uppdaterad över tid.
+
+Fokus ligger på:
+- Realtidsuppdateringar  
+- Historik  
+- Tydlig datainmatning  
+
+---
+
+## Funktionalitet
+
+Applikationen visar barer på en karta där varje plats färgkodas beroende på prisnivå.  
+Användaren kan klicka på en plats för att se mer information om aktuella och tidigare rapporter.
+
+För att lägga till information krävs ett konto. Inloggade användare kan skapa rapporter som innehåller:
+
+- Pris  
+- Ölsort  
+- Volym / glas  
+- Pris per liter  
+- Tidpunkt  
+- Bild och beskrivning (valfritt)  
+- Studentpris  
+- Guinness (ja/nej)  
+- Uteservering (ja/nej)  
+
+Flera rapporter sparas för varje plats, vilket gör att det går att se historik och avgöra hur aktuell informationen är.
+
+När en användare lägger till eller ändrar information uppdateras systemet direkt för andra användare utan att sidan behöver laddas om.
+
+Det finns även möjlighet att rapportera felaktiga uppgifter, så att information kan korrigeras.
+
+Användaren kan filtrera innehållet, till exempel efter:
+- Pris  
+- Pris per liter  
+- Studentrabatt  
+
+---
+
+## Teknologi
+
+**Frontend**
+- React  
+- TypeScript eller JavaScript  
+- Vite  
+- React Leaflet (karta)
+
+**Backend**
+- Supabase eller Firebase  
+
+---
+
+## Datamodell
+
+Systemet består av tre huvuddelar:
+- Användare  
+- Platser  
+- Rapporter  
+
+Varje rapport:
+- är kopplad till en användare och en plats  
+- beskriver ett specifikt tillfälle  
+- kan markeras som felaktig  
+
+---
+
+## Realtid
+
+Systemet synkroniserar data mellan användare så att ändringar visas direkt i gränssnittet.
+
+---
+
+## Användarflöde
+
+1. Användaren öppnar kartan och ser olika platser  
+2. Vid klick på en plats visas detaljer och tidigare rapporter  
+3. Efter inloggning kan användaren skapa en rapport  
+4. Informationen uppdateras direkt för andra användare  
 
 
 ## Getting started
