@@ -2,7 +2,10 @@ export type Venue = {
   id: number
   name: string
   price: number
-  lng: number
   lat: number
+  lng: number
+  guinness: boolean
+  beerType: string
+  temperature: number
 }
 
