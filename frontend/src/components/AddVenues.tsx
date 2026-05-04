@@ -9,8 +9,9 @@ export default function AddVenueForm({selectedCoords}: any) {
     const [lng, setLng] = useState("")
     const [guinness, setGuinness] = useState(false)
     const [beerType, setBeerType] = useState("")
-    const [temperature, setTemperature] = useState(8)
-    
+    const [temperature, setTemperature] = useState(2)
+    const [isOpen, setIsOpen] = useState(false)
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         
@@ -46,6 +47,11 @@ export default function AddVenueForm({selectedCoords}: any) {
     }, [selectedCoords])
 
     return(
+        <div className="add-venue-panel">
+            <button type="button" onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? "Stäng" : "Lägg till bar"}
+            </button>
+            {isOpen && (
         <form onSubmit={handleSubmit}>
             <input
             placeholder = "Namn"
@@ -101,5 +107,7 @@ export default function AddVenueForm({selectedCoords}: any) {
 
             <button type="submit">Lägg till</button>
         </form>
+        )}
+        </div>
     )
 }

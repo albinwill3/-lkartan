@@ -182,3 +182,28 @@
     border-right-color: var(--border);
   }
 }
+
+.add-venue-panel {
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  max-width: 360px;
+  margin: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.add-venue-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.add-venue-panel input {
+  padding: 8px;
+}
+
+.add-venue-panel button {
+  padding: 10px 14px;
+  cursor: pointer;
+}
