@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type SetStateAction } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import type { Venue } from '../data/venues'
@@ -14,29 +14,16 @@ function getColor(price: number): string {
   return 'red'
 }
 
-export default function MapView({setSelectedCoords}: any) {
+export default function MapView({venues, setSelectedCoords}: {
+  venues: Venue[]
+  setSelectedCoords: (coords: {lat: number, lng: number}) => void 
+  
+}) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
-  const [venues, setVenues] = useState<Venue[]>([])
-
-  //fetch the bars from supabase
-  useEffect(() => {
-    async function fetchVenues() {
-      const { data, error } = await supabase.from('venues').select('*')
-
-      if (error) {
-        console.error(error)
-        return
-      }
-
-      console.log('venues from supabase:', data)
-      setVenues(data as Venue[])
-    }
-
-    fetchVenues()
-  }, [])
-
+  
+  
   //create the map
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return

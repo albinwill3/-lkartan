@@ -2,7 +2,10 @@ import {useEffect, useState} from "react"
 import { supabase } from "../lib/supabase";
 import {getTempLabel} from "../utils/temperature"
 
-export default function AddVenueForm({selectedCoords}: any) {
+export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
+    selectedCoords: { lat: number; lng: number } | null
+    onVenueAdded: () => void
+}) {
     const [name, setName] = useState("")
     const [price, setPrice] = useState("")
     const [lat, setLat] = useState("")
@@ -27,9 +30,8 @@ export default function AddVenueForm({selectedCoords}: any) {
 
         const {error} = await supabase.from("venues").insert([newVenue]).select()
 
-        if(error){
-            console.error(error)
-            return
+        if(!error){
+            onVenueAdded()
         }
         setName("")
         setPrice("")
@@ -82,10 +84,10 @@ export default function AddVenueForm({selectedCoords}: any) {
             value = {beerType}
             onChange={(e) => setBeerType(e.target.value)}
             />
-
-            <label>
+            <div className="temperature-field">
+              <span className="temperature-label">
                 Temperatur: {getTempLabel(temperature)}
-            </label>
+            </span>
             <input
             type="range"
             min="1"
@@ -93,6 +95,7 @@ export default function AddVenueForm({selectedCoords}: any) {
             value={temperature}
             onChange={(e) => setTemperature(Number(e.target.value))}
             />
+            </div>
 
             <label>
                 <span>Finns Guinness på tap?</span>
