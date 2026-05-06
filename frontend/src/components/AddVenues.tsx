@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react"
 import { supabase } from "../lib/supabase";
 import {getTempLabel} from "../utils/temperature"
+import {getVajbLabel} from "../utils/vibe"
 
 export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
     selectedCoords: { lat: number; lng: number } | null
@@ -13,6 +14,7 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
     const [guinness, setGuinness] = useState(false)
     const [beerType, setBeerType] = useState("")
     const [temperature, setTemperature] = useState(2)
+    const [vajb, setVajb] = useState(4)
     const [isOpen, setIsOpen] = useState(false)
 
     async function handleSubmit(e: React.FormEvent) {
@@ -40,6 +42,7 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
         setGuinness(false)
         setBeerType("")
         setTemperature(2)
+        setVajb(4)
     }
     useEffect(() => {
         if(selectedCoords){
@@ -94,6 +97,18 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
             max="4"
             value={temperature}
             onChange={(e) => setTemperature(Number(e.target.value))}
+            />
+            </div>
+            <div className="vajb-field">
+              <span className="vajb-label">
+                Vajb: {getVajbLabel(vajb)}
+            </span>
+            <input
+            type="range"
+            min="1"
+            max="5"
+            value={vajb}
+            onChange={(e) => setVajb(Number(e.target.value))}
             />
             </div>
 
