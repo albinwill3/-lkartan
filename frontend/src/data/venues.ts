@@ -7,5 +7,6 @@ export type Venue = {
   guinness: boolean
   beerType: string
   temperature: number
+  vajb: number
 }
 

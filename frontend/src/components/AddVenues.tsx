@@ -1,9 +1,9 @@
-import {useEffect, useState} from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase";
-import {getTempLabel} from "../utils/temperature"
-import {getVajbLabel} from "../utils/vibe"
+import { getTempLabel } from "../utils/temperature"
+import { getVajbLabel } from "../utils/vibe"
 
-export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
+export default function AddVenueForm({ selectedCoords, onVenueAdded, }: {
     selectedCoords: { lat: number; lng: number } | null
     onVenueAdded: () => void
 }) {
@@ -19,7 +19,7 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        
+
         const newVenue = {
             name,
             price: Number(price),
@@ -28,11 +28,12 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
             guinness,
             beerType,
             temperature,
+            vajb,
         }
 
-        const {error} = await supabase.from("venues").insert([newVenue]).select()
+        const { error } = await supabase.from("venues").insert([newVenue]).select()
 
-        if(!error){
+        if (!error) {
             onVenueAdded()
         }
         setName("")
@@ -45,87 +46,87 @@ export default function AddVenueForm({selectedCoords, onVenueAdded,}: {
         setVajb(4)
     }
     useEffect(() => {
-        if(selectedCoords){
+        if (selectedCoords) {
             setLat(selectedCoords.lat.toString())
             setLng(selectedCoords.lng.toString())
         }
     }, [selectedCoords])
 
-    return(
+    return (
         <div className="add-venue-panel">
             <button type="button" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? "Stäng" : "Lägg till bar"}
+                {isOpen ? "Stäng" : "Lägg till bar"}
             </button>
             {isOpen && (
-        <form onSubmit={handleSubmit}>
-            <input
-            placeholder = "Namn"
-            value = {name}
-            onChange={(e) => setName(e.target.value)}
-            />
+                <form onSubmit={handleSubmit}>
+                    <input
+                        placeholder="Namn"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                    />
 
-            <input
-            placeholder="Pris"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            />
+                    <input
+                        placeholder="Pris"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                    />
 
-            <input
-            placeholder="Latitude"
-            value={lat}
-            onChange={(e) => setLat(e.target.value)}
-            />
+                    <input
+                        placeholder="Latitude"
+                        value={lat}
+                        onChange={(e) => setLat(e.target.value)}
+                    />
 
-            <input
-            placeholder="Longitude"
-            value={lng}
-            onChange={(e) => setLng(e.target.value)}
-            />
+                    <input
+                        placeholder="Longitude"
+                        value={lng}
+                        onChange={(e) => setLng(e.target.value)}
+                    />
 
-            <input
-            placeholder = "Ölsort"
-            value = {beerType}
-            onChange={(e) => setBeerType(e.target.value)}
-            />
-            <div className="temperature-field">
-              <span className="temperature-label">
-                Temperatur: {getTempLabel(temperature)}
-            </span>
-            <input
-            type="range"
-            min="1"
-            max="4"
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-            />
-            </div>
-            <div className="vajb-field">
-              <span className="vajb-label">
-                Vajb: {getVajbLabel(vajb)}
-            </span>
-            <input
-            type="range"
-            min="1"
-            max="5"
-            value={vajb}
-            onChange={(e) => setVajb(Number(e.target.value))}
-            />
-            </div>
+                    <input
+                        placeholder="Ölsort"
+                        value={beerType}
+                        onChange={(e) => setBeerType(e.target.value)}
+                    />
+                    <div className="temperature-field">
+                        <span className="temperature-label">
+                            Temperatur: {getTempLabel(temperature)}
+                        </span>
+                        <input
+                            type="range"
+                            min="1"
+                            max="4"
+                            value={temperature}
+                            onChange={(e) => setTemperature(Number(e.target.value))}
+                        />
+                    </div>
+                    <div className="vajb-field">
+                        <span className="vajb-label">
+                            Vajb: {getVajbLabel(vajb)}
+                        </span>
+                        <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={vajb}
+                            onChange={(e) => setVajb(Number(e.target.value))}
+                        />
+                    </div>
 
-            <label>
-                <span>Finns Guinness på tap?</span>
-                 <input
-                    type = "checkbox"
-                    checked = {guinness}
-                    onChange = {(e) => setGuinness(e.target.checked)}
-                 />
-            </label>
+                    <label>
+                        <span>Finns Guinness på tap?</span>
+                        <input
+                            type="checkbox"
+                            checked={guinness}
+                            onChange={(e) => setGuinness(e.target.checked)}
+                        />
+                    </label>
 
 
 
-            <button type="submit">Lägg till</button>
-        </form>
-        )}
+                    <button type="submit">Lägg till</button>
+                </form>
+            )}
         </div>
     )
 }

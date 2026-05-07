@@ -3,7 +3,8 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import type { Venue } from '../data/venues'
 import { supabase } from '../lib/supabase'
-import {getTempLabel} from "../utils/temperature"
+import { getTempLabel } from "../utils/temperature"
+import { getVajbLabel } from "../utils/vibe"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
 
@@ -14,16 +15,16 @@ function getColor(price: number): string {
   return 'red'
 }
 
-export default function MapView({venues, setSelectedCoords}: {
+export default function MapView({ venues, setSelectedCoords }: {
   venues: Venue[]
-  setSelectedCoords: (coords: {lat: number, lng: number}) => void 
-  
+  setSelectedCoords: (coords: { lat: number, lng: number }) => void
+
 }) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
-  
-  
+
+
   //create the map
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -34,11 +35,11 @@ export default function MapView({venues, setSelectedCoords}: {
       center: [16.1826, 58.5877],
       zoom: 13,
     })
-    
+
     map.on("click", (e) => {
-      const {lng, lat} = e.lngLat
+      const { lng, lat } = e.lngLat
       console.log("clicked", lat, lng)
-      setSelectedCoords({lat, lng})
+      setSelectedCoords({ lat, lng })
     })
 
 
@@ -69,7 +70,8 @@ export default function MapView({venues, setSelectedCoords}: {
             <p>${venue.price} kr</p>
             <p>Ölsort: ${venue.beerType} </p>
             <p>Temperatur: ${getTempLabel(venue.temperature)}<p/>
-            <p>Guinness: ${venue.guinness ? "Ja": "Nej"}</p>`
+            <p>Vajb: ${getVajbLabel(venue.vajb)}<p/>
+            <p>Guinness: ${venue.guinness ? "Ja" : "Nej"}</p>`
           )
         )
         .addTo(mapRef.current!)
