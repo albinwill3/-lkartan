@@ -55,12 +55,19 @@ function App() {
   if (!user) {
     return <AuthForm />
   }
+  function closeSheets() {
+    setShowProfile(false)
+    //setShowAddForm(false)
+    setShowFilter(false)
+  }
 
   return (
     <div className="app-shell">
       <MapView
         venues={venues}
         setSelectedCoords={setSelectedCoords}
+        user={user}
+        onMapClick={closeSheets}
       />
 
       <div className="top-bubble">
