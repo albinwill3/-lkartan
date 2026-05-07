@@ -78,5 +78,5 @@ export default function MapView({venues, setSelectedCoords}: {
     })
   }, [venues])
 
-  return <div ref={mapContainer} style={{ width: '100%', height: '80vh' }} />
+  return <div ref={mapContainer} style={{ width: '100%', height: '100vh' }} />
 }
