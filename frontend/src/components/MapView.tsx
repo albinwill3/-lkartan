@@ -65,6 +65,12 @@ export default function MapView({
     })
 
     map.on("click", (e) => {
+      const target = e.originalEvent.target as HTMLElement
+
+      if (target.closest(".mapboxgl-marker")) {
+        return
+      }
+
       const { lng, lat } = e.lngLat
       setSelectedCoords({ lat, lng })
       onMapClick()
@@ -126,7 +132,9 @@ export default function MapView({
         </div>
       `
 
-      const popup = new mapboxgl.Popup().setHTML(popupHtml)
+      const popup = new mapboxgl.Popup({
+        closeOnClick: true,
+      }).setHTML(popupHtml)
 
       popup.on("open", () => {
         const button = document.querySelector(
