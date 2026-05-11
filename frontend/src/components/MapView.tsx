@@ -11,9 +11,10 @@ import ReviewModal from "./ReviewModal"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
 
-function getColor(price: number): string {
-  if (price < 60) return "green"
-  if (price < 89) return "yellow"
+function getColor(price: number, volym: number): string {
+  const pricePerCl = price / volym
+  if (pricePerCl < 1.5) return "green"
+  if (pricePerCl < 2.2) return "yellow"
   return "red"
 }
 
@@ -92,7 +93,7 @@ export default function MapView({
             .map(
               (review) => `
                   <div class="popup-review">
-                    <strong>${review.rating}/5</strong>
+                    <strong>${review.rating}/10</strong>
                     <p>${review.text || ""}</p>
                   </div>
                 `
@@ -102,9 +103,11 @@ export default function MapView({
 
       const popupHtml = `
         <div class="venue-popup">
-          <h3>${venue.name}</h3>
-          <p>${venue.price} kr</p>
-          <p>Ölsort: ${venue.beerType}</p>
+          <h3>${venue.name ? venue.name : "Okänt"}</h3>
+          <p>Öl pris: ${venue.price ? venue.price + "kr" : "Okänt"}</p>
+          <p>Volym: ${venue.volym ? venue.volym + "cl" : "Okänt"}
+          <p>Kanna pris: ${venue.kannaPrice ? venue.kannaPrice + "kr" : "Okänt"}</p>
+          <p>Ölsort: ${venue.beerType ? venue.beerType : "Okänt"}</p>
           <p>Temperatur: ${getTempLabel(venue.temperature)}</p>
           <p>Vajb: ${getVajbLabel(venue.vajb)}</p>
           <p>Guinness: ${venue.guinness ? "Ja" : "Nej"}</p>
@@ -135,7 +138,7 @@ export default function MapView({
         })
       })
 
-      const marker = new mapboxgl.Marker({ color: getColor(venue.price) })
+      const marker = new mapboxgl.Marker({ color: getColor(venue.price, venue.volym) })
         .setLngLat([venue.lng, venue.lat])
         .setPopup(popup)
         .addTo(mapRef.current!)

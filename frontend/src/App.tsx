@@ -79,6 +79,7 @@ function App() {
           <AddVenuesForm
             selectedCoords={selectedCoords}
             onVenueAdded={fetchVenues}
+            onClose={() => setShowAddForm(false)}
           />
         </div>
       )}
