@@ -51,7 +51,7 @@ export default function FilterSheet({
                         type="range"
                         min={cheapestPricePerCl}
                         max={mostExpensivePricePerCl}
-                        step="0.1"
+                        step="0.01"
                         value={maxPricePerCl}
                         onChange={(e) => setMaxPricePerCl(Number(e.target.value))}
                     />
