@@ -4,6 +4,7 @@ import AuthForm from "./components/AuthForm"
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
 import type { Venue } from "./data/venues"
+import type { Review } from "./data/reviews"
 import type { User } from "@supabase/supabase-js"
 import './App.css'
 import FilterSheet from "./components/FilterSheet"
@@ -15,6 +16,7 @@ function App() {
   } | null>(null)
 
   const [venues, setVenues] = useState<Venue[]>([])
+  const [reviews, setReviews] = useState<Review[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -22,6 +24,8 @@ function App() {
   const [guinnessFilter, setGuinnessFilter] = useState<"all" | "yes" | "no">("all")
   const [maxPricePerCl, setMaxPricePerCl] = useState(999)
   const [usePriceFilter, setUsePriceFilter] = useState(false)
+  const [useRatingFilter, setUseRatingFilter] = useState(false)
+  const [minRating, setMinRating] = useState(1)
 
   async function fetchVenues() {
     const { data, error } = await supabase.from("venues").select("*")
@@ -33,9 +37,20 @@ function App() {
 
     setVenues(data as Venue[])
   }
+  async function fetchReviews() {
+    const { data, error } = await supabase.from("reviews").select("*")
+
+    if (error) {
+      console.error(error)
+      return
+    }
+
+    setReviews(data as Review[])
+  }
 
   useEffect(() => {
     fetchVenues()
+    fetchReviews()
 
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
@@ -58,6 +73,23 @@ function App() {
     await supabase.auth.signOut()
   }
 
+  function getAverageRatingForVenue(venue: Venue) {
+    const venueReviews = reviews.filter(
+      (review) => review.venue_id === venue.id
+    )
+
+    const ratings = venueReviews.map((review) => review.rating)
+
+    if (venue.rating && venue.rating > 0) {
+      ratings.push(venue.rating)
+    }
+
+    if (ratings.length === 0) return null
+
+    const total = ratings.reduce((sum, rating) => sum + rating, 0)
+
+    return total / ratings.length
+  }
   // if (!user) {
   //   return <AuthForm />
   // }
@@ -93,8 +125,18 @@ function App() {
         matchesPrice = pricePerCl <= maxPricePerCl + 0.1
       }
     }
+    let matchesRating = true
 
-    return matchesGuinness && matchesPrice
+    if (useRatingFilter) {
+      const averageRating = getAverageRatingForVenue(venue)
+
+      if (averageRating === null) {
+        matchesRating = false
+      } else {
+        matchesRating = averageRating >= minRating
+      }
+    }
+    return matchesGuinness && matchesPrice && matchesRating
   })
 
   return (
@@ -176,6 +218,10 @@ function App() {
           mostExpensivePricePerCl={mostExpensivePricePerCl}
           usePriceFilter={usePriceFilter}
           setUsePriceFilter={setUsePriceFilter}
+          useRatingFilter={useRatingFilter}
+          setUseRatingFilter={setUseRatingFilter}
+          minRating={minRating}
+          setMinRating={setMinRating}
         />
       )}
     </div>

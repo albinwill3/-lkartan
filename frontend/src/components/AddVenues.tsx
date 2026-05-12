@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase";
 import { getTempLabel } from "../utils/temperature"
-import { getVajbLabel } from "../utils/vibe"
 
 export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }: {
     selectedCoords: { lat: number; lng: number } | null
@@ -17,7 +16,7 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }:
     const [guinness, setGuinness] = useState(false)
     const [beerType, setBeerType] = useState("")
     const [temperature, setTemperature] = useState(2)
-    const [vajb, setVajb] = useState(4)
+    const [rating, setRating] = useState(5)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -32,7 +31,7 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }:
             guinness,
             beerType,
             temperature,
-            vajb,
+            rating,
         }
 
         const { error } = await supabase.from("venues").insert([newVenue]).select()
@@ -50,7 +49,7 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }:
         setGuinness(false)
         setBeerType("")
         setTemperature(2)
-        setVajb(4)
+        setRating(5)
     }
     useEffect(() => {
         if (selectedCoords) {
@@ -115,18 +114,6 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }:
                         onChange={(e) => setTemperature(Number(e.target.value))}
                     />
                 </div>
-                <div className="vajb-field">
-                    <span className="vajb-label">
-                        Vajb: {getVajbLabel(vajb)}
-                    </span>
-                    <input
-                        type="range"
-                        min="1"
-                        max="5"
-                        value={vajb}
-                        onChange={(e) => setVajb(Number(e.target.value))}
-                    />
-                </div>
 
                 <label>
                     <span>Finns Guinness på tap?</span>
@@ -136,6 +123,18 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }:
                         onChange={(e) => setGuinness(e.target.checked)}
                     />
                 </label>
+                <div className="rating-field">
+                    <span className="rating-label">
+                        Rating: {rating}
+                    </span>
+                    <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        value={rating}
+                        onChange={(e) => setRating(Number(e.target.value))}
+                    />
+                </div>
 
 
 

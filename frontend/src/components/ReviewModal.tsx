@@ -13,20 +13,12 @@ export default function ReviewModal({
     onClose: () => void
     onReviewAdded: () => void
 }) {
-    const [rating, setRating] = useState(3)
+    const [rating, setRating] = useState(5)
     const [text, setText] = useState("")
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
-        console.log("Sparar recension...", {
-            venue_id: venueId,
-            user_id: user.id,
-            rating,
-            text,
-        })
-        console.log("hej" + user)
-        console.log("tjena" + user.id)
         const { data, error } = await supabase
             .from("reviews")
 
@@ -46,7 +38,7 @@ export default function ReviewModal({
 
         console.log("Recension sparad:", data)
 
-        setRating(3)
+        setRating(5)
         setText("")
         onReviewAdded()
         onClose()
@@ -57,7 +49,7 @@ export default function ReviewModal({
             <form className="review-card" onSubmit={handleSubmit}>
                 <h2>Lägg till recension</h2>
 
-                <label>Betyg: {rating}/10</label>
+                <label>Rating: {rating}/10</label>
                 <input
                     type="range"
                     min="1"

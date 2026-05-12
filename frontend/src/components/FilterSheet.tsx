@@ -7,6 +7,11 @@ export default function FilterSheet({
     mostExpensivePricePerCl,
     usePriceFilter,
     setUsePriceFilter,
+    useRatingFilter,
+    setUseRatingFilter,
+    minRating,
+    setMinRating,
+
 }: {
     guinnessFilter: "all" | "yes" | "no"
     setGuinnessFilter: (value: "all" | "yes" | "no") => void
@@ -16,7 +21,10 @@ export default function FilterSheet({
     mostExpensivePricePerCl: number
     usePriceFilter: boolean
     setUsePriceFilter: (value: boolean) => void
-
+    useRatingFilter: boolean
+    setUseRatingFilter: (value: boolean) => void
+    minRating: number
+    setMinRating: (value: number) => void
 }) {
     return (
         <div className="filter-sheet">
@@ -54,6 +62,28 @@ export default function FilterSheet({
                         step="0.01"
                         value={maxPricePerCl}
                         onChange={(e) => setMaxPricePerCl(Number(e.target.value))}
+                    />
+                </>
+            )}
+            <label>
+                <input
+                    type="checkbox"
+                    checked={useRatingFilter}
+                    onChange={(e) => setUseRatingFilter(e.target.checked)}
+                />
+                Filtrera på Rating
+            </label>
+            {useRatingFilter && (
+                <>
+                    <label>Min rating: {minRating}</label>
+
+                    <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="0.1"
+                        value={minRating}
+                        onChange={(e) => setMinRating(Number(e.target.value))}
                     />
                 </>
             )}

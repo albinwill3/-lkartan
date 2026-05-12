@@ -222,6 +222,17 @@
   width: 80px;
 }
 
+.rating-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rating-label {
+  display: inline-block;
+  width: 80px;
+}
+
 .profile-sheet {
   position: absolute;
   left: 16px;

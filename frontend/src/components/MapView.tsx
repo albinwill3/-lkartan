@@ -6,7 +6,6 @@ import type { Review } from "../data/reviews"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
 import { getTempLabel } from "../utils/temperature"
-import { getVajbLabel } from "../utils/vibe"
 import ReviewModal from "./ReviewModal"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
@@ -115,8 +114,8 @@ export default function MapView({
           <p>Kanna pris: ${venue.kannaPrice ? venue.kannaPrice + "kr" : "Okänt"}</p>
           <p>Ölsort: ${venue.beerType ? venue.beerType : "Okänt"}</p>
           <p>Temperatur: ${getTempLabel(venue.temperature)}</p>
-          <p>Vajb: ${getVajbLabel(venue.vajb)}</p>
           <p>Guinness: ${venue.guinness ? "Ja" : "Nej"}</p>
+          <p>Rating: ${venue.rating ? venue.rating + "/10" : "Okänt"} </p>
 
           ${user
           ? `<button class="add-review-button" data-venue-id="${venue.id}">
