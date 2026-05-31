@@ -1,58 +1,81 @@
 import { useEffect, useRef, useState } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
-import type { Venue } from "../data/venues"
+import type { VenueGroup } from "../utils/groupVenues"
+import type { Vote } from "../data/votes"
 import type { Review } from "../data/reviews"
+import type { ReviewVote } from "../data/reviewVotes"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
-import { getTempLabel } from "../utils/temperature"
 import ReviewModal from "./ReviewModal"
+import VenueGroupPanel from "./VenueGroupPanel"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
 
 function getColor(price: number, volym: number): string {
   const pricePerCl = price / volym
-  if (pricePerCl < 1.5) return "green"
-  if (pricePerCl < 2.2) return "yellow"
-  return "red"
+  if (pricePerCl < 1.5) return "#3fb64b"
+  if (pricePerCl < 2.2) return "#e6c940"
+  return "#e04040"
+}
+
+function groupColor(group: VenueGroup, votes: Vote[]): string {
+  // Use the top-voted venue's price/cl for color; fall back to first
+  const sorted = [...group.venues].sort((a, b) => {
+    const netA = votes.filter((v) => v.venue_id === a.id).reduce((s, v) => s + v.value, 0)
+    const netB = votes.filter((v) => v.venue_id === b.id).reduce((s, v) => s + v.value, 0)
+    return netB - netA
+  })
+  const top = sorted[0]
+  if (!top.price || !top.volym) return "#888"
+  return getColor(top.price, top.volym)
 }
 
 export default function MapView({
-  venues,
+  venueGroups,
+  votes,
+  reviews,
+  reviewVotes,
   setSelectedCoords,
   user,
-  onMapClick
+  onMapClick,
+  placingMode,
+  onPlaceConfirmed,
+  onCancelPlace,
+  onVoteChange,
+  onReviewVoteChange,
 }: {
-  venues: Venue[]
+  venueGroups: VenueGroup[]
+  votes: Vote[]
+  reviews: Review[]
+  reviewVotes: ReviewVote[]
   setSelectedCoords: (coords: { lat: number; lng: number }) => void
   user: User | null
   onMapClick: () => void
+  placingMode: boolean
+  onPlaceConfirmed: (coords: { lat: number; lng: number }) => void
+  onCancelPlace: () => void
+  onVoteChange: (votes: Vote[]) => void
+  onReviewVoteChange: (votes: ReviewVote[]) => void
 }) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
+  const tempMarkerRef = useRef<mapboxgl.Marker | null>(null)
 
-  const [reviews, setReviews] = useState<Review[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<VenueGroup | null>(null)
   const [reviewVenueId, setReviewVenueId] = useState<number | null>(null)
+  const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null)
 
   async function fetchReviews() {
     const { data, error } = await supabase
       .from("reviews")
       .select("*")
       .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error(error)
-      return
-    }
-
-    setReviews(data as Review[])
+    if (error) console.error(error)
   }
 
-  useEffect(() => {
-    fetchReviews()
-  }, [])
-
+  // Map init
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
@@ -65,11 +88,7 @@ export default function MapView({
 
     map.on("click", (e) => {
       const target = e.originalEvent.target as HTMLElement
-
-      if (target.closest(".mapboxgl-marker")) {
-        return
-      }
-
+      if (target.closest(".mapboxgl-marker")) return
       const { lng, lat } = e.lngLat
       setSelectedCoords({ lat, lng })
       onMapClick()
@@ -83,80 +102,152 @@ export default function MapView({
     }
   }, [setSelectedCoords])
 
+  // Placing mode cursor + cleanup
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (placingMode) {
+      map.getCanvas().style.cursor = "crosshair"
+      setSelectedGroup(null)
+      setPendingCoords(null)
+      if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
+    } else {
+      map.getCanvas().style.cursor = ""
+      setPendingCoords(null)
+      if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
+    }
+  }, [placingMode])
+
+  // Click-to-place listener
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !placingMode) return
+
+    function handlePlaceClick(e: mapboxgl.MapMouseEvent) {
+      const target = e.originalEvent.target as HTMLElement
+      if (target.closest(".mapboxgl-marker")) return
+
+      const { lng, lat } = e.lngLat
+
+      if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
+
+      const el = document.createElement("div")
+      el.style.cssText = `
+        width: 18px; height: 18px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        background: #f5a623;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      `
+      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        .setLngLat([lng, lat])
+        .addTo(map)
+
+      tempMarkerRef.current = marker
+      setPendingCoords({ lat, lng })
+    }
+
+    map.on("click", handlePlaceClick)
+    return () => { map.off("click", handlePlaceClick) }
+  }, [placingMode])
+
+  // Render group markers
   useEffect(() => {
     if (!mapRef.current) return
 
-    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
 
-    venues.forEach((venue) => {
-      const venueReviews = reviews.filter((review) => review.venue_id === venue.id)
+    venueGroups.forEach((group) => {
+      const color = groupColor(group, votes)
+      const count = group.venues.length
 
-      const reviewsHtml =
-        venueReviews.length > 0
-          ? venueReviews
-            .map(
-              (review) => `
-                  <div class="popup-review">
-                    <strong>${review.rating}/10</strong>
-                    <p>${review.text || ""}</p>
-                  </div>
-                `
-            )
-            .join("")
-          : `<p>Inga recensioner ännu.</p>`
-
-      const popupHtml = `
-        <div class="venue-popup">
-          <h3>${venue.name ? venue.name : "Okänt"}</h3>
-          <p>Öl pris: ${venue.price ? venue.price + "kr" : "Okänt"}</p>
-          <p>Volym: ${venue.volym ? venue.volym + "cl" : "Okänt"}
-          <p>Kanna pris: ${venue.kannaPrice ? venue.kannaPrice + "kr" : "Okänt"}</p>
-          <p>Ölsort: ${venue.beerType ? venue.beerType : "Okänt"}</p>
-          <p>Temperatur: ${getTempLabel(venue.temperature)}</p>
-          <p>Guinness: ${venue.guinness ? "Ja" : "Nej"}</p>
-          <p>Rating: ${venue.rating ? venue.rating + "/10" : "Okänt"} </p>
-
-          ${user
-          ? `<button class="add-review-button" data-venue-id="${venue.id}">
-                  Lägg till recension
-                </button>`
-          : `<p>Logga in för att lägga till recension.</p>`
-        }
-
-          <details class="reviews-dropdown">
-            <summary>Recensioner</summary>
-            ${reviewsHtml}
-          </details>
-        </div>
+      const el = document.createElement("div")
+      el.style.cssText = `
+        width: ${count > 1 ? "20px" : "14px"};
+        height: ${count > 1 ? "20px" : "14px"};
+        border-radius: 50%;
+        background: ${color};
+        border: 2px solid rgba(255,255,255,0.85);
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
       `
+      if (count > 1) el.textContent = String(count)
 
-      const popup = new mapboxgl.Popup({
-        closeOnClick: true,
-      }).setHTML(popupHtml)
-
-      popup.on("open", () => {
-        const button = document.querySelector(
-          `.add-review-button[data-venue-id="${venue.id}"]`
-        )
-
-        button?.addEventListener("click", () => {
-          setReviewVenueId(venue.id)
-        })
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        if (placingMode) return
+        setSelectedGroup(group)
       })
 
-      const marker = new mapboxgl.Marker({ color: getColor(venue.price, venue.volym) })
-        .setLngLat([venue.lng, venue.lat])
-        .setPopup(popup)
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([group.lng, group.lat])
         .addTo(mapRef.current!)
 
       markersRef.current.push(marker)
     })
-  }, [venues, reviews, user])
+  }, [venueGroups, votes, placingMode])
 
   return (
     <>
       <div ref={mapContainer} style={{ width: "100%", height: "100vh" }} />
+
+      {/* Placing mode banner */}
+      {placingMode && (
+        <div className="placing-banner">
+          {pendingCoords ? (
+            <>
+              <span>Placera baren här?</span>
+              <div className="placing-actions">
+                <button className="placing-confirm" onClick={() => onPlaceConfirmed(pendingCoords)}>
+                  Bekräfta
+                </button>
+                <button className="placing-cancel" onClick={() => {
+                  if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
+                  setPendingCoords(null)
+                }}>
+                  Flytta
+                </button>
+                <button className="placing-cancel" onClick={() => {
+                  if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
+                  onCancelPlace()
+                }}>
+                  Avbryt
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span>Tryck på kartan för att placera baren</span>
+              <button className="placing-cancel" onClick={onCancelPlace}>Avbryt</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Venue group panel */}
+      {selectedGroup && !placingMode && (
+        <VenueGroupPanel
+          group={selectedGroup}
+          votes={votes}
+          reviews={reviews}
+          reviewVotes={reviewVotes}
+          user={user}
+          onClose={() => setSelectedGroup(null)}
+          onVoteChange={onVoteChange}
+          onReviewVoteChange={onReviewVoteChange}
+          onAddReview={(venueId) => setReviewVenueId(venueId)}
+        />
+      )}
 
       {reviewVenueId !== null && user && (
         <ReviewModal

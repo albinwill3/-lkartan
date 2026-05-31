@@ -11,7 +11,6 @@ export default function FilterSheet({
     setUseRatingFilter,
     minRating,
     setMinRating,
-
 }: {
     guinnessFilter: "all" | "yes" | "no"
     setGuinnessFilter: (value: "all" | "yes" | "no") => void
@@ -30,64 +29,65 @@ export default function FilterSheet({
         <div className="filter-sheet">
             <h2>Filter</h2>
 
-            <label>Guinness</label>
-            <select
-                value={guinnessFilter}
-                onChange={(e) =>
-                    setGuinnessFilter(e.target.value as "all" | "yes" | "no")
-                }
-            >
-                <option value="all">Alla</option>
-                <option value="yes">Har Guinness</option>
-                <option value="no">Har inte Guinness</option>
-            </select>
-            <label>
-                <input
-                    type="checkbox"
-                    checked={usePriceFilter}
-                    onChange={(e) => setUsePriceFilter(e.target.checked)}
-                />
-                Filtrera på pris per cl
-            </label>
-            {usePriceFilter && (
-                <>
-                    <label>
-                        Maxpris: {maxPricePerCl.toFixed(2)} kr/cl
-                    </label>
+            <div className="filter-group">
+                <label>Guinness</label>
+                <select
+                    value={guinnessFilter}
+                    onChange={(e) => setGuinnessFilter(e.target.value as "all" | "yes" | "no")}
+                >
+                    <option value="all">Alla</option>
+                    <option value="yes">Har Guinness</option>
+                    <option value="no">Har inte Guinness</option>
+                </select>
+            </div>
 
+            <div className="filter-group">
+                <label className="filter-toggle">
                     <input
-                        type="range"
-                        min={cheapestPricePerCl}
-                        max={mostExpensivePricePerCl}
-                        step="0.01"
-                        value={maxPricePerCl}
-                        onChange={(e) => setMaxPricePerCl(Number(e.target.value))}
+                        type="checkbox"
+                        checked={usePriceFilter}
+                        onChange={(e) => setUsePriceFilter(e.target.checked)}
                     />
-                </>
-            )}
-            <label>
-                <input
-                    type="checkbox"
-                    checked={useRatingFilter}
-                    onChange={(e) => setUseRatingFilter(e.target.checked)}
-                />
-                Filtrera på Rating
-            </label>
-            {useRatingFilter && (
-                <>
-                    <label>Min rating: {minRating}</label>
+                    Filtrera på pris per cl
+                </label>
+                {usePriceFilter && (
+                    <>
+                        <span className="filter-value">Max: {maxPricePerCl.toFixed(2)} kr/cl</span>
+                        <input
+                            type="range"
+                            min={cheapestPricePerCl}
+                            max={mostExpensivePricePerCl}
+                            step="0.01"
+                            value={maxPricePerCl}
+                            onChange={(e) => setMaxPricePerCl(Number(e.target.value))}
+                        />
+                    </>
+                )}
+            </div>
 
+            <div className="filter-group">
+                <label className="filter-toggle">
                     <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        step="0.1"
-                        value={minRating}
-                        onChange={(e) => setMinRating(Number(e.target.value))}
+                        type="checkbox"
+                        checked={useRatingFilter}
+                        onChange={(e) => setUseRatingFilter(e.target.checked)}
                     />
-                </>
-            )}
-
+                    Filtrera på rating
+                </label>
+                {useRatingFilter && (
+                    <>
+                        <span className="filter-value">Min rating: {minRating}</span>
+                        <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            step="0.1"
+                            value={minRating}
+                            onChange={(e) => setMinRating(Number(e.target.value))}
+                        />
+                    </>
+                )}
+            </div>
         </div>
     )
 }

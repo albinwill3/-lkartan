@@ -10,5 +10,6 @@ export type Venue = {
   beerType: string
   temperature: number
   rating: number
+  user_id: string | null
 }
 

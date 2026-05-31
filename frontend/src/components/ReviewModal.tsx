@@ -64,8 +64,8 @@ export default function ReviewModal({
                     onChange={(e) => setText(e.target.value)}
                 />
 
-                <button type="submit">Spara recension</button>
-                <button type="button" onClick={onClose}>
+                <button type="submit" className="btn-primary">Spara recension</button>
+                <button type="button" className="btn-ghost" onClick={onClose}>
                     Stäng
                 </button>
             </form>

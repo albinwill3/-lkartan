@@ -1,146 +1,137 @@
 import { useEffect, useState } from "react"
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase"
 import { getTempLabel } from "../utils/temperature"
 
-export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, }: {
-    selectedCoords: { lat: number; lng: number } | null
-    onVenueAdded: () => void
-    onClose: () => void
+export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, userId }: {
+  selectedCoords: { lat: number; lng: number } | null
+  onVenueAdded: () => void
+  onClose: () => void
+  userId: string | null
 }) {
-    const [name, setName] = useState("")
-    const [price, setPrice] = useState("")
-    const [volym, setVolym] = useState("")
-    const [kannaPrice, setKannaPrice] = useState("")
-    const [lat, setLat] = useState("")
-    const [lng, setLng] = useState("")
-    const [guinness, setGuinness] = useState(false)
-    const [beerType, setBeerType] = useState("")
-    const [temperature, setTemperature] = useState(2)
-    const [rating, setRating] = useState(5)
+  const [name, setName] = useState("")
+  const [price, setPrice] = useState("")
+  const [volym, setVolym] = useState("")
+  const [kannaPrice, setKannaPrice] = useState("")
+  const [guinness, setGuinness] = useState(false)
+  const [beerType, setBeerType] = useState("")
+  const [temperature, setTemperature] = useState(2)
+  const [rating, setRating] = useState(5)
+  const [lat, setLat] = useState("")
+  const [lng, setLng] = useState("")
 
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault()
-
-        const newVenue = {
-            name,
-            price: Number(price),
-            volym: Number(volym),
-            kannaPrice: Number(kannaPrice),
-            lat: Number(lat),
-            lng: Number(lng),
-            guinness,
-            beerType,
-            temperature,
-            rating,
-        }
-
-        const { error } = await supabase.from("venues").insert([newVenue]).select()
-
-        if (!error) {
-            onVenueAdded()
-            onClose()
-        }
-        setName("")
-        setPrice("")
-        setVolym("")
-        setKannaPrice("")
-        setLat("")
-        setLng("")
-        setGuinness(false)
-        setBeerType("")
-        setTemperature(2)
-        setRating(5)
+  useEffect(() => {
+    if (selectedCoords) {
+      setLat(selectedCoords.lat.toString())
+      setLng(selectedCoords.lng.toString())
     }
-    useEffect(() => {
-        if (selectedCoords) {
-            setLat(selectedCoords.lat.toString())
-            setLng(selectedCoords.lng.toString())
-        }
-    }, [selectedCoords])
+  }, [selectedCoords])
 
-    return (
-        <div className="add-venue-panel">
-            <form onSubmit={handleSubmit}>
-                <input
-                    placeholder="Namn"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                />
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
 
-                <input
-                    placeholder="Pris"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                />
+    const { error } = await supabase.from("venues").insert([{
+      name,
+      price: Number(price),
+      volym: Number(volym),
+      kannaPrice: Number(kannaPrice),
+      lat: Number(lat),
+      lng: Number(lng),
+      guinness,
+      beerType,
+      temperature,
+      rating,
+      user_id: userId,
+    }]).select()
 
-                <input
-                    placeholder="Volym (cl)"
-                    value={volym}
-                    onChange={(e) => setVolym(e.target.value)}
-                />
+    if (error) {
+      console.error(error)
+      return
+    }
 
-                <input
-                    placeholder="Pris på kanna"
-                    value={kannaPrice}
-                    onChange={(e) => setKannaPrice(e.target.value)}
-                />
+    onVenueAdded()
+    onClose()
+  }
 
-                <input
-                    placeholder="Latitude"
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                />
+  return (
+    <div className="add-venue-form">
+      <h2>Lägg till bar</h2>
 
-                <input
-                    placeholder="Longitude"
-                    value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                />
+      {selectedCoords && (
+        <p className="add-venue-coords">
+          📍 {selectedCoords.lat.toFixed(5)}, {selectedCoords.lng.toFixed(5)}
+        </p>
+      )}
 
-                <input
-                    placeholder="Ölsort"
-                    value={beerType}
-                    onChange={(e) => setBeerType(e.target.value)}
-                />
-                <div className="temperature-field">
-                    <span className="temperature-label">
-                        Temperatur: {getTempLabel(temperature)}
-                    </span>
-                    <input
-                        type="range"
-                        min="1"
-                        max="4"
-                        value={temperature}
-                        onChange={(e) => setTemperature(Number(e.target.value))}
-                    />
-                </div>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <input
+          placeholder="Namn på baren"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
 
-                <label>
-                    <span>Finns Guinness på tap?</span>
-                    <input
-                        type="checkbox"
-                        checked={guinness}
-                        onChange={(e) => setGuinness(e.target.checked)}
-                    />
-                </label>
-                <div className="rating-field">
-                    <span className="rating-label">
-                        Rating: {rating}
-                    </span>
-                    <input
-                        type="range"
-                        min="1"
-                        max="10"
-                        value={rating}
-                        onChange={(e) => setRating(Number(e.target.value))}
-                    />
-                </div>
-
-
-
-                <button type="submit">Lägg till</button>
-            </form>
-
+        <div className="form-row">
+          <input
+            placeholder="Ölpris (kr)"
+            type="number"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+          <input
+            placeholder="Volym (cl)"
+            type="number"
+            value={volym}
+            onChange={(e) => setVolym(e.target.value)}
+          />
         </div>
-    )
+
+        <input
+          placeholder="Kannapris (kr)"
+          type="number"
+          value={kannaPrice}
+          onChange={(e) => setKannaPrice(e.target.value)}
+        />
+
+        <input
+          placeholder="Ölsort"
+          value={beerType}
+          onChange={(e) => setBeerType(e.target.value)}
+        />
+
+        <div className="filter-group">
+          <label className="stat-label">Temperatur: {getTempLabel(temperature)}</label>
+          <input
+            type="range"
+            min="1"
+            max="4"
+            value={temperature}
+            onChange={(e) => setTemperature(Number(e.target.value))}
+          />
+        </div>
+
+        <div className="filter-group">
+          <label className="stat-label">Rating: {rating}/10</label>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={rating}
+            onChange={(e) => setRating(Number(e.target.value))}
+          />
+        </div>
+
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={guinness}
+            onChange={(e) => setGuinness(e.target.checked)}
+          />
+          Guinness på tap
+        </label>
+
+        <button type="submit" className="btn-primary">Spara</button>
+        <button type="button" className="btn-ghost" onClick={onClose}>Avbryt</button>
+      </form>
+    </div>
+  )
 }

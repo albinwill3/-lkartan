@@ -6,6 +6,7 @@ export default function AuthForm() {
   const [password, setPassword] = useState("")
   const [isLogin, setIsLogin] = useState(true)
   const [message, setMessage] = useState("")
+  const [isError, setIsError] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -19,10 +20,12 @@ export default function AuthForm() {
 
     if (error) {
       setMessage(error.message)
+      setIsError(true)
       setLoading(false)
       return
     }
 
+    setIsError(false)
     setMessage(isLogin ? "Du är inloggad!" : "Konto skapat! Verifiera ditt konto på mail.")
     setEmail("")
     setPassword("")
@@ -30,37 +33,37 @@ export default function AuthForm() {
   }
 
   return (
-    <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>{isLogin ? "Logga in" : "Skapa konto"}</h1>
+    <form className="auth-form" onSubmit={handleSubmit}>
+      <h2>{isLogin ? "Logga in" : "Skapa konto"}</h2>
 
-        <input
-          type="email"
-          placeholder="E-post"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+      <input
+        type="email"
+        placeholder="E-post"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
 
-        <input
-          type="password"
-          placeholder="Lösenord"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={6}
-        />
+      <input
+        type="password"
+        placeholder="Lösenord"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+        minLength={6}
+      />
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Laddar..." : isLogin ? "Logga in" : "Skapa konto"}
-        </button>
+      <button type="submit" className="btn-primary" disabled={loading}>
+        {loading ? "Laddar..." : isLogin ? "Logga in" : "Skapa konto"}
+      </button>
 
-        <button type="button" onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? "Skapa konto istället" : "Logga in istället"}
-        </button>
+      <button type="button" className="btn-secondary" onClick={() => setIsLogin(!isLogin)}>
+        {isLogin ? "Skapa konto istället" : "Logga in istället"}
+      </button>
 
-        {message && <p>{message}</p>}
-      </form>
-    </div>
+      {message && (
+        <p className={`message ${isError ? "error" : "success"}`}>{message}</p>
+      )}
+    </form>
   )
 }
