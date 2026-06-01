@@ -4,9 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css"
 import type { VenueGroup } from "../utils/groupVenues"
 import type { Vote } from "../data/votes"
 import type { Review } from "../data/reviews"
-import type { ReviewVote } from "../data/reviewVotes"
 import type { User } from "@supabase/supabase-js"
-import { supabase } from "../lib/supabase"
 import ReviewModal from "./ReviewModal"
 import VenueGroupPanel from "./VenueGroupPanel"
 
@@ -35,7 +33,6 @@ export default function MapView({
   venueGroups,
   votes,
   reviews,
-  reviewVotes,
   setSelectedCoords,
   user,
   onMapClick,
@@ -43,12 +40,11 @@ export default function MapView({
   onPlaceConfirmed,
   onCancelPlace,
   onVoteChange,
-  onReviewVoteChange,
+  onReviewAdded,
 }: {
   venueGroups: VenueGroup[]
   votes: Vote[]
   reviews: Review[]
-  reviewVotes: ReviewVote[]
   setSelectedCoords: (coords: { lat: number; lng: number }) => void
   user: User | null
   onMapClick: () => void
@@ -56,7 +52,7 @@ export default function MapView({
   onPlaceConfirmed: (coords: { lat: number; lng: number }) => void
   onCancelPlace: () => void
   onVoteChange: (votes: Vote[]) => void
-  onReviewVoteChange: (votes: ReviewVote[]) => void
+  onReviewAdded: () => void
 }) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -67,13 +63,6 @@ export default function MapView({
   const [reviewVenueId, setReviewVenueId] = useState<number | null>(null)
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null)
 
-  async function fetchReviews() {
-    const { data, error } = await supabase
-      .from("reviews")
-      .select("*")
-      .order("created_at", { ascending: false })
-    if (error) console.error(error)
-  }
 
   // Map init
   useEffect(() => {
@@ -240,11 +229,9 @@ export default function MapView({
           group={selectedGroup}
           votes={votes}
           reviews={reviews}
-          reviewVotes={reviewVotes}
           user={user}
           onClose={() => setSelectedGroup(null)}
           onVoteChange={onVoteChange}
-          onReviewVoteChange={onReviewVoteChange}
           onAddReview={(venueId) => setReviewVenueId(venueId)}
         />
       )}
@@ -254,7 +241,7 @@ export default function MapView({
           venueId={reviewVenueId}
           user={user}
           onClose={() => setReviewVenueId(null)}
-          onReviewAdded={fetchReviews}
+          onReviewAdded={onReviewAdded}
         />
       )}
     </>

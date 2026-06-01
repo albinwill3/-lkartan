@@ -313,6 +313,54 @@
   margin: 0 8px;
 }
 
+.profile-expandable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.profile-expand-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: var(--surface-raised);
+  color: var(--text-heading);
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 0;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.profile-expand-btn:hover {
+  background: var(--border);
+}
+
+.expand-arrow {
+  font-size: 18px;
+  color: var(--text);
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.expand-arrow.open {
+  transform: rotate(90deg);
+}
+
+.profile-expand-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
 .profile-section {
   display: flex;
   flex-direction: column;

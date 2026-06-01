@@ -1,107 +1,41 @@
 import { useState } from "react"
 import type { VenueGroup } from "../utils/groupVenues"
 import type { Vote } from "../data/votes"
-import type { ReviewVote } from "../data/reviewVotes"
 import type { Review } from "../data/reviews"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
 import { getTempLabel } from "../utils/temperature"
 import type { Venue } from "../data/venues"
 
-function netVotes(id: number, votes: { venue_id?: number; review_id?: number; value: number }[], key: "venue_id" | "review_id"): number {
-  return votes.filter((v) => (v as any)[key] === id).reduce((s, v) => s + v.value, 0)
+function netVotes(venueId: number, votes: Vote[]): number {
+  return votes.filter((v) => v.venue_id === venueId).reduce((s, v) => s + v.value, 0)
 }
 
-function myVoteValue(id: number, userId: string, votes: any[], key: string): 1 | -1 | 0 {
-  const v = votes.find((v) => v[key] === id && v.user_id === userId)
+function myVoteValue(venueId: number, userId: string, votes: Vote[]): 1 | -1 | 0 {
+  const v = votes.find((v) => v.venue_id === venueId && v.user_id === userId)
   return (v?.value ?? 0) as 1 | -1 | 0
 }
-
-// ── Review item with voting ──────────────────────────────
-
-function ReviewItem({
-  review,
-  reviewVotes,
-  user,
-  onReviewVoteChange,
-}: {
-  review: Review
-  reviewVotes: ReviewVote[]
-  user: User | null
-  onReviewVoteChange: (votes: ReviewVote[]) => void
-}) {
-  const net = netVotes(review.id, reviewVotes, "review_id")
-  const myVote = user ? myVoteValue(review.id, user.id, reviewVotes, "review_id") : 0
-  const [voting, setVoting] = useState(false)
-
-  async function handleVote(value: 1 | -1) {
-    if (!user || voting) return
-    setVoting(true)
-    if (myVote === value) {
-      await supabase.from("review_votes").delete().eq("user_id", user.id).eq("review_id", review.id)
-    } else {
-      await supabase.from("review_votes").upsert(
-        { user_id: user.id, review_id: review.id, value },
-        { onConflict: "user_id,review_id" }
-      )
-    }
-    const { data } = await supabase.from("review_votes").select("*")
-    if (data) onReviewVoteChange(data as ReviewVote[])
-    setVoting(false)
-  }
-
-  return (
-    <div className="venue-review-item">
-      <div className="review-item-header">
-        <strong>{review.rating}/10</strong>
-        <div className="vote-controls">
-          <button
-            className={`vote-btn up ${myVote === 1 ? "active" : ""}`}
-            onClick={() => handleVote(1)}
-            disabled={!user || voting}
-            title={user ? "Rösta upp" : "Logga in för att rösta"}
-          >▲</button>
-          <span className={`vote-count ${net > 0 ? "positive" : net < 0 ? "negative" : ""}`}>
-            {net > 0 ? `+${net}` : net}
-          </span>
-          <button
-            className={`vote-btn down ${myVote === -1 ? "active" : ""}`}
-            onClick={() => handleVote(-1)}
-            disabled={!user || voting}
-            title={user ? "Rösta ner" : "Logga in för att rösta"}
-          >▼</button>
-        </div>
-      </div>
-      {review.text && <p>{review.text}</p>}
-    </div>
-  )
-}
-
-// ── Submission card ──────────────────────────────────────
 
 function SubmissionCard({
   venue,
   votes,
   reviews,
-  reviewVotes,
   user,
   onVoteChange,
-  onReviewVoteChange,
   onAddReview,
   userAlreadyReviewed,
 }: {
   venue: Venue
   votes: Vote[]
   reviews: Review[]
-  reviewVotes: ReviewVote[]
   user: User | null
   onVoteChange: (votes: Vote[]) => void
-  onReviewVoteChange: (votes: ReviewVote[]) => void
   onAddReview: (venueId: number) => void
   userAlreadyReviewed: boolean
 }) {
-  const net = netVotes(venue.id, votes, "venue_id")
-  const myVote = user ? myVoteValue(venue.id, user.id, votes, "venue_id") : 0
+  const net = netVotes(venue.id, votes)
+  const myVote = user ? myVoteValue(venue.id, user.id, votes) : 0
+  const isOwnPost = user?.id === venue.user_id
   const [voting, setVoting] = useState(false)
   const [showReviews, setShowReviews] = useState(false)
 
@@ -140,8 +74,8 @@ function SubmissionCard({
           <button
             className={`vote-btn up ${myVote === 1 ? "active" : ""}`}
             onClick={() => handleVote(1)}
-            disabled={!user || voting}
-            title={user ? "Rösta upp" : "Logga in för att rösta"}
+            disabled={!user || voting || isOwnPost}
+            title={isOwnPost ? "Du kan inte rösta på egna inlägg" : user ? "Rösta upp" : "Logga in för att rösta"}
           >▲</button>
           <span className={`vote-count ${net > 0 ? "positive" : net < 0 ? "negative" : ""}`}>
             {net > 0 ? `+${net}` : net}
@@ -149,8 +83,8 @@ function SubmissionCard({
           <button
             className={`vote-btn down ${myVote === -1 ? "active" : ""}`}
             onClick={() => handleVote(-1)}
-            disabled={!user || voting}
-            title={user ? "Rösta ner" : "Logga in för att rösta"}
+            disabled={!user || voting || isOwnPost}
+            title={isOwnPost ? "Du kan inte rösta på egna inlägg" : user ? "Rösta ner" : "Logga in för att rösta"}
           >▼</button>
         </div>
       </div>
@@ -185,13 +119,10 @@ function SubmissionCard({
           {venueReviews.length === 0 ? (
             <p className="venue-panel-hint">Inga recensioner ännu</p>
           ) : venueReviews.map((r) => (
-            <ReviewItem
-              key={r.id}
-              review={r}
-              reviewVotes={reviewVotes}
-              user={user}
-              onReviewVoteChange={onReviewVoteChange}
-            />
+            <div key={r.id} className="venue-review-item">
+              <strong>{r.rating}/10</strong>
+              {r.text && <p>{r.text}</p>}
+            </div>
           ))}
         </div>
       )}
@@ -199,31 +130,25 @@ function SubmissionCard({
   )
 }
 
-// ── Main panel ───────────────────────────────────────────
-
 export default function VenueGroupPanel({
   group,
   votes,
   reviews,
-  reviewVotes,
   user,
   onClose,
   onVoteChange,
-  onReviewVoteChange,
   onAddReview,
 }: {
   group: VenueGroup
   votes: Vote[]
   reviews: Review[]
-  reviewVotes: ReviewVote[]
   user: User | null
   onClose: () => void
   onVoteChange: (votes: Vote[]) => void
-  onReviewVoteChange: (votes: ReviewVote[]) => void
   onAddReview: (venueId: number) => void
 }) {
   const sorted = [...group.venues].sort(
-    (a, b) => netVotes(b.id, votes, "venue_id") - netVotes(a.id, votes, "venue_id")
+    (a, b) => netVotes(b.id, votes) - netVotes(a.id, votes)
   )
 
   const userReviewedIds = user
@@ -250,10 +175,8 @@ export default function VenueGroupPanel({
               venue={venue}
               votes={votes}
               reviews={reviews}
-              reviewVotes={reviewVotes}
               user={user}
               onVoteChange={onVoteChange}
-              onReviewVoteChange={onReviewVoteChange}
               onAddReview={onAddReview}
               userAlreadyReviewed={userReviewedIds.has(venue.id)}
             />

@@ -6,10 +6,10 @@ import { supabase } from "./lib/supabase"
 import type { Venue } from "./data/venues"
 import type { Review } from "./data/reviews"
 import type { Vote } from "./data/votes"
-import type { ReviewVote } from "./data/reviewVotes"
 import type { User } from "@supabase/supabase-js"
 import './App.css'
 import FilterSheet from "./components/FilterSheet"
+import ProfileSheet from "./components/ProfileSheet"
 import { groupVenues } from "./utils/groupVenues"
 
 function App() {
@@ -17,7 +17,6 @@ function App() {
   const [venues, setVenues] = useState<Venue[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [votes, setVotes] = useState<Vote[]>([])
-  const [reviewVotes, setReviewVotes] = useState<ReviewVote[]>([])
   const [user, setUser] = useState<User | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [placingMode, setPlacingMode] = useState(false)
@@ -47,17 +46,11 @@ function App() {
     setVotes(data as Vote[])
   }
 
-  async function fetchReviewVotes() {
-    const { data, error } = await supabase.from("review_votes").select("*")
-    if (error) { console.error(error); return }
-    setReviewVotes(data as ReviewVote[])
-  }
 
   useEffect(() => {
     fetchVenues()
     fetchReviews()
     fetchVotes()
-    fetchReviewVotes()
 
     supabase.auth.getUser().then(({ data }) => setUser(data.user))
 
@@ -65,7 +58,18 @@ function App() {
       setUser(session?.user ?? null)
     })
 
-    return () => { listener.subscription.unsubscribe() }
+    // Realtime: reviews update live for all users
+    const reviewChannel = supabase
+      .channel("reviews-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, () => {
+        fetchReviews()
+      })
+      .subscribe()
+
+    return () => {
+      listener.subscription.unsubscribe()
+      supabase.removeChannel(reviewChannel)
+    }
   }, [])
 
   async function handleLogout() {
@@ -130,7 +134,6 @@ function App() {
         venueGroups={venueGroups}
         votes={votes}
         reviews={reviews}
-        reviewVotes={reviewVotes}
         setSelectedCoords={setSelectedCoords}
         user={user}
         onMapClick={closeSheets}
@@ -138,7 +141,7 @@ function App() {
         onPlaceConfirmed={handlePlaceConfirmed}
         onCancelPlace={handleCancelPlace}
         onVoteChange={setVotes}
-        onReviewVoteChange={setReviewVotes}
+        onReviewAdded={fetchReviews}
       />
 
       <div className="map-legend">
@@ -194,98 +197,13 @@ function App() {
 
       {showProfile && (
         <div className="profile-sheet">
-          {user ? (
-            <>
-              <h2>Profil</h2>
-              <p className="profile-email">{user.email}</p>
-
-              {/* Vote summary */}
-              {(() => {
-                const myVenueIds = new Set(venues.filter((v) => v.user_id === user.id).map((v) => v.id))
-                const myReviewIds = new Set(reviews.filter((r) => r.user_id === user.id).map((r) => r.id))
-
-                const venueUpvotes   = votes.filter((v) => myVenueIds.has(v.venue_id) && v.value === 1).length
-                const venueDownvotes = votes.filter((v) => myVenueIds.has(v.venue_id) && v.value === -1).length
-                const reviewUpvotes   = reviewVotes.filter((v) => myReviewIds.has(v.review_id) && v.value === 1).length
-                const reviewDownvotes = reviewVotes.filter((v) => myReviewIds.has(v.review_id) && v.value === -1).length
-
-                const totalUp   = venueUpvotes + reviewUpvotes
-                const totalDown = venueDownvotes + reviewDownvotes
-
-                return (
-                  <div className="profile-vote-summary">
-                    <div className="profile-vote-stat up">
-                      <span className="vote-summary-icon">▲</span>
-                      <span className="vote-summary-count">{totalUp}</span>
-                      <span className="vote-summary-label">uppröster</span>
-                    </div>
-                    <div className="profile-vote-divider" />
-                    <div className="profile-vote-stat down">
-                      <span className="vote-summary-icon">▼</span>
-                      <span className="vote-summary-count">{totalDown}</span>
-                      <span className="vote-summary-label">nerröster</span>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* Added venues */}
-              {(() => {
-                const myVenues = venues.filter((v) => v.user_id === user.id)
-                return (
-                  <div className="profile-section">
-                    <span className="stat-label">Tillagda barer ({myVenues.length})</span>
-                    {myVenues.length === 0 ? (
-                      <p className="venue-panel-hint">Du har inte lagt till några barer ännu</p>
-                    ) : myVenues.map((v) => (
-                      <div key={v.id} className="profile-venue-item">
-                        <span>{v.name || "Okänd bar"}</span>
-                        {v.price && v.volym ? (
-                          <span className="profile-venue-price">{v.price} kr / {v.volym} cl</span>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-
-              {/* Reviews with vote counts */}
-              {(() => {
-                const myReviews = reviews.filter((r) => r.user_id === user.id)
-                return (
-                  <div className="profile-section">
-                    <span className="stat-label">Dina recensioner ({myReviews.length})</span>
-                    {myReviews.length === 0 ? (
-                      <p className="venue-panel-hint">Du har inte skrivit några recensioner ännu</p>
-                    ) : myReviews.map((r) => {
-                      const venue = venues.find((v) => v.id === r.venue_id)
-                      const net = reviewVotes
-                        .filter((rv) => rv.review_id === r.id)
-                        .reduce((s, rv) => s + rv.value, 0)
-                      return (
-                        <div key={r.id} className="profile-review-item">
-                          <div className="profile-review-header">
-                            <strong>{venue?.name || "Okänd bar"}</strong>
-                            <div className="profile-review-meta">
-                              <span className="profile-review-rating">{r.rating}/10</span>
-                              <span className={`profile-review-votes ${net > 0 ? "positive" : net < 0 ? "negative" : ""}`}>
-                                {net > 0 ? `▲ +${net}` : net < 0 ? `▼ ${net}` : "0 röster"}
-                              </span>
-                            </div>
-                          </div>
-                          {r.text && <p className="profile-review-text">{r.text}</p>}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-
-              <button className="btn-danger" onClick={handleLogout}>Logga ut</button>
-            </>
-          ) : (
-            <AuthForm />
-          )}
+          <ProfileSheet
+            user={user}
+            venues={venues}
+            reviews={reviews}
+            votes={votes}
+            onLogout={handleLogout}
+          />
         </div>
       )}
 
