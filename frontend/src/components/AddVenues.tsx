@@ -126,6 +126,7 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, us
             checked={guinness}
             onChange={(e) => setGuinness(e.target.checked)}
           />
+          <span className="custom-checkbox"></span>
           Guinness på tap
         </label>
 

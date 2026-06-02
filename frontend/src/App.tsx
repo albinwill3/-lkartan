@@ -145,10 +145,10 @@ function App() {
       />
 
       <div className="map-legend">
-        <span className="legend-title">Pris per cl</span>
-        <div className="legend-row"><span className="legend-dot green" />Billigt (&lt;1,5 kr)</div>
-        <div className="legend-row"><span className="legend-dot yellow" />Medel (1,5–2,2 kr)</div>
-        <div className="legend-row"><span className="legend-dot red" />Dyrt (&gt;2,2 kr)</div>
+        <span className="legend-title">Prisklasser</span>
+        <div className="legend-row"><span className="legend-dot green" />Billigt</div>
+        <div className="legend-row"><span className="legend-dot yellow" />Medel</div>
+        <div className="legend-row"><span className="legend-dot red" />Dyrt</div>
       </div>
 
       <div className="top-bubble">
