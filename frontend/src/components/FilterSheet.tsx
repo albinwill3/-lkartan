@@ -3,9 +3,15 @@ export default function FilterSheet({
     setGuinnessFilter,
     maxPricePerCl,
     setMaxPricePerCl,
+    maxPricePerOl,
+    setMaxPricePerOl,
+    cheapestPricePerOl,
+    mostExpensivePricePerOl,
     cheapestPricePerCl,
     mostExpensivePricePerCl,
     usePriceFilter,
+    setUsePriceOlFilter,
+    usePriceOlFilter,
     setUsePriceFilter,
     useRatingFilter,
     setUseRatingFilter,
@@ -16,8 +22,14 @@ export default function FilterSheet({
     setGuinnessFilter: (value: "all" | "yes" | "no") => void
     maxPricePerCl: number
     setMaxPricePerCl: (value: number) => void
+    maxPricePerOl: number
+    setMaxPricePerOl: (value: number) => void
     cheapestPricePerCl: number
+    cheapestPricePerOl: number
+    mostExpensivePricePerOl: number
     mostExpensivePricePerCl: number
+    usePriceOlFilter: boolean
+    setUsePriceOlFilter: (value: boolean) => void
     usePriceFilter: boolean
     setUsePriceFilter: (value: boolean) => void
     useRatingFilter: boolean
@@ -41,6 +53,31 @@ export default function FilterSheet({
                 </select>
             </div>
 
+            {/* Pris per Birra */}
+            <div className="filter-group">
+                <label className="filter-toggle">
+                    <input
+                        type="checkbox"
+                        checked={usePriceOlFilter}
+                        onChange={(e) => setUsePriceOlFilter(e.target.checked)}
+                    />
+                    Filtrera på pris per birra
+                </label>
+                {usePriceOlFilter && (
+                    <>
+                        <span className="filter-value">Max: {maxPricePerOl} kr</span>
+                        <input
+                            type="range"
+                            min={cheapestPricePerOl}
+                            max={mostExpensivePricePerOl}
+                            step="1"
+                            value={maxPricePerOl}
+                            onChange={(e) => setMaxPricePerOl(Number(e.target.value))}
+                        />
+                    </>
+                )}
+                {/* Pris per Cl */}
+            </div>
             <div className="filter-group">
                 <label className="filter-toggle">
                     <input

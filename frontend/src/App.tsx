@@ -24,6 +24,8 @@ function App() {
   const [showFilter, setShowFilter] = useState(false)
   const [guinnessFilter, setGuinnessFilter] = useState<"all" | "yes" | "no">("all")
   const [maxPricePerCl, setMaxPricePerCl] = useState(999)
+  const [maxPricePerOl, setMaxPricePerOl] = useState(999)
+  const [usePriceOlFilter, setUsePriceOlFilter] = useState(false)
   const [usePriceFilter, setUsePriceFilter] = useState(false)
   const [useRatingFilter, setUseRatingFilter] = useState(false)
   const [minRating, setMinRating] = useState(1)
@@ -105,12 +107,21 @@ function App() {
   const cheapestPricePerCl = pricePerClValues.length > 0 ? Math.min(...pricePerClValues) : 0
   const mostExpensivePricePerCl = pricePerClValues.length > 0 ? Math.max(...pricePerClValues) : 5
 
+  const pricePerOlValues = venues.filter((v) => v.price > 0).map((v) => v.price)
+  const cheapestPricePerOl = pricePerOlValues.length > 0 ? Math.min(...pricePerOlValues) : 0
+  const mostExpensivePricePerOl = pricePerOlValues.length > 0 ? Math.max(...pricePerOlValues) : 200
+
   const filteredVenues = venues.filter((venue) => {
     const matchesGuinness =
       guinnessFilter === "all" ||
       (guinnessFilter === "yes" && venue.guinness) ||
       (guinnessFilter === "no" && !venue.guinness)
 
+    let matchesOlPrice = true
+    if (usePriceOlFilter) {
+      if (!venue.price || venue.price <= 0) matchesOlPrice = false
+      else matchesOlPrice = venue.price <= maxPricePerOl + 0.1
+    }
     let matchesPrice = true
     if (usePriceFilter) {
       if (!venue.volym || venue.volym <= 0) matchesPrice = false
@@ -123,7 +134,7 @@ function App() {
       matchesRating = avg !== null && avg >= minRating
     }
 
-    return matchesGuinness && matchesPrice && matchesRating
+    return matchesGuinness && matchesPrice && matchesRating && matchesOlPrice
   })
 
   const venueGroups = groupVenues(filteredVenues)
@@ -213,10 +224,16 @@ function App() {
           setGuinnessFilter={setGuinnessFilter}
           maxPricePerCl={maxPricePerCl}
           setMaxPricePerCl={setMaxPricePerCl}
+          maxPricePerOl={maxPricePerOl}
+          setMaxPricePerOl={setMaxPricePerOl}
+          cheapestPricePerOl={cheapestPricePerOl}
+          mostExpensivePricePerOl={mostExpensivePricePerOl}
           cheapestPricePerCl={cheapestPricePerCl}
           mostExpensivePricePerCl={mostExpensivePricePerCl}
           usePriceFilter={usePriceFilter}
           setUsePriceFilter={setUsePriceFilter}
+          usePriceOlFilter={usePriceOlFilter}
+          setUsePriceOlFilter={setUsePriceOlFilter}
           useRatingFilter={useRatingFilter}
           setUseRatingFilter={setUseRatingFilter}
           minRating={minRating}
