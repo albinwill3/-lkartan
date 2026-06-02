@@ -155,8 +155,8 @@ export default function MapView({
 
       const el = document.createElement("div")
       el.style.cssText = `
-        width: ${count > 1 ? "20px" : "14px"};
-        height: ${count > 1 ? "20px" : "14px"};
+        width: ${count > 1 ? "28px" : "20px"};
+        height: ${count > 1 ? "28px" : "20px"};
         border-radius: 50%;
         background: ${color};
         border: 2px solid rgba(255,255,255,0.85);
