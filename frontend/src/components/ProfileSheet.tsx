@@ -4,6 +4,7 @@ import type { Venue } from "../data/venues"
 import type { Review } from "../data/reviews"
 import type { Vote } from "../data/votes"
 import AuthForm from "./AuthForm"
+import { supabase } from "../lib/supabase"
 
 export default function ProfileSheet({
   user,
@@ -11,17 +12,26 @@ export default function ProfileSheet({
   reviews,
   votes,
   onLogout,
+  onVenuesChanged,
 }: {
   user: User | null
   venues: Venue[]
   reviews: Review[]
   votes: Vote[]
   onLogout: () => void
+  onVenuesChanged: () => void
 }) {
   const [showVenues, setShowVenues] = useState(false)
   const [showReviews, setShowReviews] = useState(false)
 
   if (!user) return <AuthForm />
+
+  async function handleDeleteVenue(v: Venue) {
+    if (!confirm(`Ta bort "${v.name}"?`)) return
+    const { error } = await supabase.from("venues").delete().eq("id", v.id)
+    if (error) { console.error(error); return }
+    onVenuesChanged()
+  }
 
   const myVenues = venues.filter((v) => v.user_id === user.id)
   const myReviews = reviews.filter((r) => r.user_id === user.id)
@@ -64,9 +74,16 @@ export default function ProfileSheet({
             ) : myVenues.map((v) => (
               <div key={v.id} className="profile-venue-item">
                 <span>{v.name || "Okänd bar"}</span>
-                {v.price && v.volym ? (
-                  <span className="profile-venue-price">{v.price} kr / {v.volym} cl</span>
-                ) : null}
+                <div className="profile-venue-right">
+                  {v.price && v.volym ? (
+                    <span className="profile-venue-price">{v.price} kr / {v.volym} cl</span>
+                  ) : null}
+                  <button
+                    className="btn-delete-inline small"
+                    onClick={() => handleDeleteVenue(v)}
+                    title="Ta bort"
+                  >✕</button>
+                </div>
               </div>
             ))}
           </div>

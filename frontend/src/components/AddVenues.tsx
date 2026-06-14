@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../lib/supabase"
-import { getTempLabel } from "../utils/temperature"
+import { initHoursGroups, buildOpeningHours } from "../utils/openingHours"
+import type { HoursGroup } from "../utils/openingHours"
+import OpeningHoursEditor from "./OpeningHoursEditor"
+import RangeSlider from "./RangeSlider"
+import TempSelector from "./TempSelector"
 
 export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, userId }: {
   selectedCoords: { lat: number; lng: number } | null
@@ -18,6 +22,10 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, us
   const [rating, setRating] = useState(5)
   const [lat, setLat] = useState("")
   const [lng, setLng] = useState("")
+  const [showHours, setShowHours] = useState(false)
+  const [hoursGroups, setHoursGroups] = useState<HoursGroup[]>(() => initHoursGroups(null))
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (selectedCoords) {
@@ -26,25 +34,42 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, us
     }
   }, [selectedCoords])
 
+  function updateHoursGroup(i: number, patch: Partial<HoursGroup>) {
+    setHoursGroups((prev) => prev.map((g, idx) => (idx === i ? { ...g, ...patch } : g)))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
+    setSubmitting(true)
 
-    const { error } = await supabase.from("venues").insert([{
+    const opening_hours = buildOpeningHours(hoursGroups)
+
+    const venueData: Record<string, unknown> = {
       name,
-      price: Number(price),
-      volym: Number(volym),
-      kannaPrice: Number(kannaPrice),
+      price: price ? Number(price) : null,
+      volym: volym ? Number(volym) : null,
+      kannaPrice: kannaPrice ? Number(kannaPrice) : null,
       lat: Number(lat),
       lng: Number(lng),
       guinness,
-      beerType,
+      beerType: beerType || null,
       temperature,
       rating,
       user_id: userId,
-    }]).select()
+    }
 
-    if (error) {
-      console.error(error)
+    if (opening_hours !== null) {
+      venueData.opening_hours = opening_hours
+    }
+
+    const { error: insertError } = await supabase.from("venues").insert([venueData]).select()
+
+    setSubmitting(false)
+
+    if (insertError) {
+      console.error(insertError)
+      setError(insertError.message)
       return
     }
 
@@ -99,25 +124,13 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, us
         />
 
         <div className="filter-group">
-          <label className="stat-label">Temperatur: {getTempLabel(temperature)}</label>
-          <input
-            type="range"
-            min="1"
-            max="4"
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-          />
+          <label className="stat-label">Temperatur</label>
+          <TempSelector value={temperature} onChange={setTemperature} />
         </div>
 
         <div className="filter-group">
           <label className="stat-label">Rating: {rating}/10</label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={rating}
-            onChange={(e) => setRating(Number(e.target.value))}
-          />
+          <RangeSlider min={1} max={10} step={1} value={rating} onChange={setRating} />
         </div>
 
         <label className="checkbox-field">
@@ -130,8 +143,25 @@ export default function AddVenueForm({ selectedCoords, onVenueAdded, onClose, us
           Guinness på tap
         </label>
 
-        <button type="submit" className="btn-primary">Spara</button>
-        <button type="button" className="btn-ghost" onClick={onClose}>Avbryt</button>
+        <div className="filter-group">
+          <button
+            type="button"
+            className="hours-toggle-btn"
+            onClick={() => setShowHours((v) => !v)}
+          >
+            <span>Öppettider (valfritt)</span>
+            <span className={`expand-arrow ${showHours ? "open" : ""}`}>›</span>
+          </button>
+          {showHours && (
+            <OpeningHoursEditor groups={hoursGroups} onChange={updateHoursGroup} />
+          )}
+        </div>
+
+        {error && <p className="form-error">{error}</p>}
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? "Sparar..." : "Spara"}
+        </button>
+        <button type="button" className="btn-ghost" onClick={onClose} disabled={submitting}>Avbryt</button>
       </form>
     </div>
   )
