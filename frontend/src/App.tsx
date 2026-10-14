@@ -1,9 +1,9 @@
 import MapView from "./components/MapView"
 import AddVenuesForm from "./components/AddVenues"
-import AuthForm from "./components/AuthForm"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { supabase } from "./lib/supabase"
 import type { Venue } from "./data/venues"
+import type { Report } from "./data/reports"
 import type { Review } from "./data/reviews"
 import type { Vote } from "./data/votes"
 import type { User } from "@supabase/supabase-js"
@@ -15,6 +15,9 @@ import { groupVenues } from "./utils/groupVenues"
 function App() {
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [venues, setVenues] = useState<Venue[]>([])
+  const [reports, setReports] = useState<Report[]>([])
+  const [reportVenue, setReportVenue] = useState<Venue | null>(null)
+  const [editingReport, setEditingReport] = useState<Report | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
   const [votes, setVotes] = useState<Vote[]>([])
   const [user, setUser] = useState<User | null>(null)
@@ -31,9 +34,16 @@ function App() {
   const [minRating, setMinRating] = useState(1)
 
   async function fetchVenues() {
-    const { data, error } = await supabase.from("venues").select("*")
-    if (error) { console.error(error); return }
-    setVenues(data as Venue[])
+    const [venueResult, reportResult] = await Promise.all([
+      supabase.from("venues").select("*"),
+      supabase.from("reports").select("*"),
+    ])
+    if (venueResult.error || reportResult.error) {
+      console.error(venueResult.error ?? reportResult.error)
+      return
+    }
+    setVenues(venueResult.data as Venue[])
+    setReports(reportResult.data as Report[])
   }
 
   async function fetchReviews() {
@@ -60,30 +70,41 @@ function App() {
       setUser(session?.user ?? null)
     })
 
-    // Realtime: reviews update live for all users
-    const reviewChannel = supabase
-      .channel("reviews-realtime")
+    const dataChannel = supabase
+      .channel("app-data-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "venues" }, () => {
+        fetchVenues()
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, (payload) => {
+        fetchVenues()
+        if (payload.eventType === "DELETE") {
+          fetchReviews()
+          fetchVotes()
+        }
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, () => {
         fetchReviews()
       })
-      .subscribe()
+      .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, () => {
+        fetchVotes()
+      })
+      .subscribe((status) => {
+        // Catch changes made before subscribing or while disconnected.
+        if (status === "SUBSCRIBED") {
+          fetchVenues()
+          fetchReviews()
+          fetchVotes()
+        }
+      })
 
     return () => {
       listener.subscription.unsubscribe()
-      supabase.removeChannel(reviewChannel)
+      supabase.removeChannel(dataChannel)
     }
   }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
-  }
-
-  function getAverageRatingForVenue(venue: Venue) {
-    const venueReviews = reviews.filter((r) => r.venue_id === venue.id)
-    const ratings = venueReviews.map((r) => r.rating)
-    if (venue.rating && venue.rating > 0) ratings.push(venue.rating)
-    if (ratings.length === 0) return null
-    return ratings.reduce((sum, r) => sum + r, 0) / ratings.length
   }
 
   function closeSheets() {
@@ -92,6 +113,8 @@ function App() {
   }
 
   function handlePlaceConfirmed(coords: { lat: number; lng: number }) {
+    setEditingReport(null)
+    setReportVenue(null)
     setSelectedCoords(coords)
     setPlacingMode(false)
     setShowAddForm(true)
@@ -103,15 +126,43 @@ function App() {
     setPlacingMode(false)
   }
 
-  const pricePerClValues = venues.filter((v) => v.volym > 0).map((v) => v.price / v.volym)
+  function handleEditReport(report: Report) {
+    const venue = venues.find((v) => v.id === report.venue_id)
+    if (!venue || !user || report.user_id !== user.id) return
+    setEditingReport(report)
+    setReportVenue(venue)
+    setSelectedCoords({ lat: venue.lat, lng: venue.lng })
+    setPlacingMode(false)
+    setShowAddForm(true)
+    closeSheets()
+  }
+
+  function handleReportDeleted(reportId: number) {
+    setReports((current) => current.filter((r) => r.id !== reportId))
+    setVotes((current) => current.filter((v) => v.report_id !== reportId))
+    setReviews((current) => current.filter((r) => r.report_id !== reportId))
+  }
+
+  const pricePerClValues = reports.filter((v) => v.volym > 0).map((v) => v.price / v.volym)
   const cheapestPricePerCl = pricePerClValues.length > 0 ? Math.min(...pricePerClValues) : 0
   const mostExpensivePricePerCl = pricePerClValues.length > 0 ? Math.max(...pricePerClValues) : 5
 
-  const pricePerOlValues = venues.filter((v) => v.price > 0).map((v) => v.price)
+  const pricePerOlValues = reports.filter((v) => v.price > 0).map((v) => v.price)
   const cheapestPricePerOl = pricePerOlValues.length > 0 ? Math.min(...pricePerOlValues) : 0
   const mostExpensivePricePerOl = pricePerOlValues.length > 0 ? Math.max(...pricePerOlValues) : 200
 
-  const filteredVenues = venues.filter((venue) => {
+  const reviewRatings = useMemo(() => {
+    const ratings = new Map<number, { sum: number; count: number }>()
+    for (const review of reviews) {
+      const totals = ratings.get(review.report_id) ?? { sum: 0, count: 0 }
+      totals.sum += review.rating
+      totals.count++
+      ratings.set(review.report_id, totals)
+    }
+    return ratings
+  }, [reviews])
+
+  const filteredReports = useMemo(() => reports.filter((venue) => {
     const matchesGuinness =
       guinnessFilter === "all" ||
       (guinnessFilter === "yes" && venue.guinness) ||
@@ -130,14 +181,20 @@ function App() {
 
     let matchesRating = true
     if (useRatingFilter) {
-      const avg = getAverageRatingForVenue(venue)
+      const totals = reviewRatings.get(venue.id)
+      const hasOwnRating = venue.rating > 0
+      const count = (totals?.count ?? 0) + (hasOwnRating ? 1 : 0)
+      const sum = (totals?.sum ?? 0) + (hasOwnRating ? venue.rating : 0)
+      const avg = count ? sum / count : null
       matchesRating = avg !== null && avg >= minRating
     }
 
     return matchesGuinness && matchesPrice && matchesRating && matchesOlPrice
-  })
+  }), [reports, reviewRatings, guinnessFilter, usePriceOlFilter, maxPricePerOl, usePriceFilter, maxPricePerCl, useRatingFilter, minRating])
 
-  const venueGroups = groupVenues(filteredVenues)
+  const hasFilters = guinnessFilter !== "all" || usePriceOlFilter || usePriceFilter || useRatingFilter
+  const venueGroups = useMemo(() => groupVenues(venues, filteredReports)
+    .filter((group) => !hasFilters || group.reports.length > 0), [venues, filteredReports, hasFilters])
 
   return (
     <div className="app-shell">
@@ -153,6 +210,17 @@ function App() {
         onCancelPlace={handleCancelPlace}
         onVoteChange={setVotes}
         onReviewAdded={fetchReviews}
+        onEditReport={handleEditReport}
+        onReportDeleted={handleReportDeleted}
+        onAddReport={(venueId) => {
+          const venue = venues.find((v) => v.id === venueId)
+          if (!venue || !user) return
+          setEditingReport(null)
+          setReportVenue(venue)
+          setSelectedCoords({ lat: venue.lat, lng: venue.lng })
+          setShowAddForm(true)
+          closeSheets()
+        }}
       />
 
       <div className="map-legend">
@@ -169,7 +237,10 @@ function App() {
       {showAddForm && (
         <div className="add-sheet">
           <AddVenuesForm
+            key={editingReport ? `edit-${editingReport.id}` : reportVenue?.id ?? "new"}
             selectedCoords={selectedCoords}
+            venue={reportVenue}
+            reportToEdit={editingReport}
             onVenueAdded={fetchVenues}
             onClose={() => setShowAddForm(false)}
             userId={user?.id ?? null}
@@ -211,9 +282,12 @@ function App() {
           <ProfileSheet
             user={user}
             venues={venues}
+            reports={reports}
             reviews={reviews}
             votes={votes}
             onLogout={handleLogout}
+            onEditReport={handleEditReport}
+            onReportDeleted={handleReportDeleted}
           />
         </div>
       )}

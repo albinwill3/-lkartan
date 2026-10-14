@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 import type { VenueGroup } from "../utils/groupVenues"
@@ -7,6 +7,7 @@ import type { Review } from "../data/reviews"
 import type { User } from "@supabase/supabase-js"
 import ReviewModal from "./ReviewModal"
 import VenueGroupPanel from "./VenueGroupPanel"
+import type { Report } from "../data/reports"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
 
@@ -17,15 +18,13 @@ function getColor(price: number, volym: number): string {
   return "#e04040"
 }
 
-function groupColor(group: VenueGroup, votes: Vote[]): string {
-  // Use the top-voted venue's price/cl for color; fall back to first
-  const sorted = [...group.venues].sort((a, b) => {
-    const netA = votes.filter((v) => v.venue_id === a.id).reduce((s, v) => s + v.value, 0)
-    const netB = votes.filter((v) => v.venue_id === b.id).reduce((s, v) => s + v.value, 0)
-    return netB - netA
-  })
-  const top = sorted[0]
-  if (!top.price || !top.volym) return "#888"
+function groupColor(group: VenueGroup, voteTotals: Map<number, number>): string {
+  // Use the top-voted report's price/cl for the marker color.
+  let top: Report | undefined
+  for (const report of group.reports) {
+    if (!top || (voteTotals.get(report.id) ?? 0) > (voteTotals.get(top.id) ?? 0)) top = report
+  }
+  if (!top?.price || !top.volym) return "#888"
   return getColor(top.price, top.volym)
 }
 
@@ -41,6 +40,9 @@ export default function MapView({
   onCancelPlace,
   onVoteChange,
   onReviewAdded,
+  onAddReport,
+  onEditReport,
+  onReportDeleted,
 }: {
   venueGroups: VenueGroup[]
   votes: Vote[]
@@ -53,14 +55,24 @@ export default function MapView({
   onCancelPlace: () => void
   onVoteChange: (votes: Vote[]) => void
   onReviewAdded: () => void
+  onAddReport: (venueId: number) => void
+  onEditReport: (report: Report) => void
+  onReportDeleted: (reportId: number) => void
 }) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const markersRef = useRef(new Map<string, mapboxgl.Marker>())
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null)
+  const placingModeRef = useRef(placingMode)
+  const voteTotals = useMemo(() => {
+    const totals = new Map<number, number>()
+    for (const vote of votes) totals.set(vote.report_id, (totals.get(vote.report_id) ?? 0) + vote.value)
+    return totals
+  }, [votes])
 
-  const [selectedGroup, setSelectedGroup] = useState<VenueGroup | null>(null)
-  const [reviewVenueId, setReviewVenueId] = useState<number | null>(null)
+  const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
+  const selectedGroup = venueGroups.find((group) => group.key === selectedGroupKey) ?? null
+  const [reviewReportId, setReviewReportId] = useState<number | null>(null)
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null)
 
 
@@ -86,6 +98,7 @@ export default function MapView({
     mapRef.current = map
 
     return () => {
+      markersRef.current.clear()
       map.remove()
       mapRef.current = null
     }
@@ -93,12 +106,13 @@ export default function MapView({
 
   // Placing mode cursor + cleanup
   useEffect(() => {
+    placingModeRef.current = placingMode
     const map = mapRef.current
     if (!map) return
 
     if (placingMode) {
       map.getCanvas().style.cursor = "crosshair"
-      setSelectedGroup(null)
+      setSelectedGroupKey(null)
       setPendingCoords(null)
       if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
     } else {
@@ -113,7 +127,7 @@ export default function MapView({
     const map = mapRef.current
     if (!map || !placingMode) return
 
-    function handlePlaceClick(e: mapboxgl.MapMouseEvent) {
+    const handlePlaceClick = (e: mapboxgl.MapMouseEvent) => {
       const target = e.originalEvent.target as HTMLElement
       if (target.closest(".mapboxgl-marker")) return
 
@@ -123,12 +137,12 @@ export default function MapView({
 
       const el = document.createElement("div")
       el.style.cssText = `
-        width: 18px; height: 18px;
+        width: 28px; height: 28px;
         border-radius: 50% 50% 50% 0;
         transform: rotate(-45deg);
         background: #f5a623;
-        border: 2px solid #fff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 2px rgba(15,15,21,0.75), 0 3px 10px rgba(0,0,0,0.5);
       `
       const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([lng, lat])
@@ -144,47 +158,72 @@ export default function MapView({
 
   // Render group markers
   useEffect(() => {
-    if (!mapRef.current) return
+    const map = mapRef.current
+    if (!map) return
 
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
+    const visibleKeys = new Set(venueGroups.map((group) => group.key))
+    for (const [key, marker] of markersRef.current) {
+      if (!visibleKeys.has(key)) {
+        marker.remove()
+        markersRef.current.delete(key)
+      }
+    }
 
     venueGroups.forEach((group) => {
-      const color = groupColor(group, votes)
-      const count = group.venues.length
+      const color = groupColor(group, voteTotals)
+      const count = group.reports.length
+      const existing = markersRef.current.get(group.key)
+      if (existing) {
+        const el = existing.getElement()
+        if (el.dataset.color !== color) {
+          el.style.background = color
+          el.dataset.color = color
+        }
+        if (el.dataset.count !== String(count)) {
+          el.style.width = count > 1 ? "34px" : "28px"
+          el.style.height = el.style.width
+          el.textContent = count > 1 ? String(count) : ""
+          el.dataset.count = String(count)
+        }
+        const position = existing.getLngLat()
+        if (position.lng !== group.lng || position.lat !== group.lat) existing.setLngLat([group.lng, group.lat])
+        return
+      }
 
       const el = document.createElement("div")
+      el.dataset.color = color
+      el.dataset.count = String(count)
       el.style.cssText = `
-        width: ${count > 1 ? "20px" : "14px"};
-        height: ${count > 1 ? "20px" : "14px"};
+        width: ${count > 1 ? "34px" : "28px"};
+        height: ${count > 1 ? "34px" : "28px"};
         border-radius: 50%;
         background: ${color};
-        border: 2px solid rgba(255,255,255,0.85);
+        border: 3px solid #fff;
         cursor: pointer;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        box-shadow: 0 0 0 2px rgba(15,15,21,0.75), 0 3px 10px rgba(0,0,0,0.5);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        color: #fff;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f0f15;
+        text-shadow: 0 1px 1px rgba(255,255,255,0.6);
       `
       if (count > 1) el.textContent = String(count)
 
       el.addEventListener("click", (e) => {
         e.stopPropagation()
-        if (placingMode) return
-        setSelectedGroup(group)
+        if (placingModeRef.current) return
+        setSelectedGroupKey(group.key)
       })
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([group.lng, group.lat])
-        .addTo(mapRef.current!)
+        .addTo(map)
 
-      markersRef.current.push(marker)
+      markersRef.current.set(group.key, marker)
     })
-  }, [venueGroups, votes, placingMode])
+  }, [venueGroups, voteTotals])
 
   return (
     <>
@@ -230,17 +269,26 @@ export default function MapView({
           votes={votes}
           reviews={reviews}
           user={user}
-          onClose={() => setSelectedGroup(null)}
+          onClose={() => setSelectedGroupKey(null)}
           onVoteChange={onVoteChange}
-          onAddReview={(venueId) => setReviewVenueId(venueId)}
+          onAddReview={setReviewReportId}
+          onEditReport={(report) => {
+            onEditReport(report)
+            setSelectedGroupKey(null)
+          }}
+          onReportDeleted={onReportDeleted}
+          onAddReport={() => {
+            onAddReport(selectedGroup.id)
+            setSelectedGroupKey(null)
+          }}
         />
       )}
 
-      {reviewVenueId !== null && user && (
+      {reviewReportId !== null && user && (
         <ReviewModal
-          venueId={reviewVenueId}
+          reportId={reviewReportId}
           user={user}
-          onClose={() => setReviewVenueId(null)}
+          onClose={() => setReviewReportId(null)}
           onReviewAdded={onReviewAdded}
         />
       )}

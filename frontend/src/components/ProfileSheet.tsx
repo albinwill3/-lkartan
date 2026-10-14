@@ -1,33 +1,43 @@
 import { useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import type { Venue } from "../data/venues"
+import type { Report } from "../data/reports"
 import type { Review } from "../data/reviews"
 import type { Vote } from "../data/votes"
 import AuthForm from "./AuthForm"
+import ReportActions from "./ReportActions"
 
 export default function ProfileSheet({
   user,
   venues,
+  reports,
   reviews,
   votes,
   onLogout,
+  onEditReport,
+  onReportDeleted,
 }: {
   user: User | null
   venues: Venue[]
+  reports: Report[]
   reviews: Review[]
   votes: Vote[]
   onLogout: () => void
+  onEditReport: (report: Report) => void
+  onReportDeleted: (reportId: number) => void
 }) {
   const [showVenues, setShowVenues] = useState(false)
   const [showReviews, setShowReviews] = useState(false)
+  const [showReports, setShowReports] = useState(false)
 
   if (!user) return <AuthForm />
 
   const myVenues = venues.filter((v) => v.user_id === user.id)
+  const myReports = reports.filter((r) => r.user_id === user.id)
+  const myReportIds = new Set(myReports.map((r) => r.id))
   const myReviews = reviews.filter((r) => r.user_id === user.id)
-  const myVenueIds = new Set(myVenues.map((v) => v.id))
-  const totalUp   = votes.filter((v) => myVenueIds.has(v.venue_id) && v.value === 1).length
-  const totalDown = votes.filter((v) => myVenueIds.has(v.venue_id) && v.value === -1).length
+  const totalUp   = votes.filter((v) => myReportIds.has(v.report_id) && v.value === 1).length
+  const totalDown = votes.filter((v) => myReportIds.has(v.report_id) && v.value === -1).length
 
   return (
     <>
@@ -64,16 +74,30 @@ export default function ProfileSheet({
             ) : myVenues.map((v) => (
               <div key={v.id} className="profile-venue-item">
                 <span>{v.name || "Okänd bar"}</span>
-                {v.price && v.volym ? (
-                  <span className="profile-venue-price">{v.price} kr / {v.volym} cl</span>
-                ) : null}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Dina recensioner */}
+      <div className="profile-expandable">
+        <button className="profile-expand-btn" onClick={() => setShowReports((value) => !value)} aria-expanded={showReports}>
+          <span>Dina rapporter ({myReports.length})</span>
+          <span className={`expand-arrow ${showReports ? "open" : ""}`}>›</span>
+        </button>
+        {showReports && (
+          <div className="profile-expand-content">
+            {myReports.length === 0 ? <p className="venue-panel-hint">Du har inte lagt till några rapporter ännu</p> : myReports.map((report) => (
+              <div key={report.id} className="profile-review-item">
+                <strong>{venues.find((venue) => venue.id === report.venue_id)?.name ?? "Okänd bar"}</strong>
+                <span>{report.price} kr / {report.volym} cl</span>
+                <ReportActions report={report} userId={user.id} onEdit={onEditReport} onDeleted={onReportDeleted} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="profile-expandable">
         <button
           className="profile-expand-btn"
@@ -87,7 +111,8 @@ export default function ProfileSheet({
             {myReviews.length === 0 ? (
               <p className="venue-panel-hint">Du har inte skrivit några recensioner ännu</p>
             ) : myReviews.map((r) => {
-              const venue = venues.find((v) => v.id === r.venue_id)
+              const report = reports.find((report) => report.id === r.report_id)
+              const venue = venues.find((v) => v.id === report?.venue_id)
               return (
                 <div key={r.id} className="profile-review-item">
                   <div className="profile-review-header">

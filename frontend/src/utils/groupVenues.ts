@@ -1,27 +1,29 @@
 import type { Venue } from "../data/venues"
+import type { Report } from "../data/reports"
 
 export type VenueGroup = {
+  id: number
   key: string
   name: string
   lat: number
   lng: number
-  venues: Venue[]
+  reports: Report[]
 }
 
-export function groupVenues(venues: Venue[]): VenueGroup[] {
-  const map = new Map<string, Venue[]>()
+export function groupVenues(venues: Venue[], reports: Report[]): VenueGroup[] {
+  const reportsByVenue = new Map<number, Report[]>()
 
-  for (const venue of venues) {
-    const key = venue.name?.trim().toLowerCase() || `${venue.lat.toFixed(4)},${venue.lng.toFixed(4)}`
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(venue)
+  for (const report of reports) {
+    if (!reportsByVenue.has(report.venue_id)) reportsByVenue.set(report.venue_id, [])
+    reportsByVenue.get(report.venue_id)!.push(report)
   }
 
-  return Array.from(map.entries()).map(([key, group]) => ({
-    key,
-    name: group[0].name || "Okänt ställe",
-    lat: group.reduce((s, v) => s + v.lat, 0) / group.length,
-    lng: group.reduce((s, v) => s + v.lng, 0) / group.length,
-    venues: group,
+  return venues.map((venue) => ({
+    id: venue.id,
+    key: String(venue.id),
+    name: venue.name,
+    lat: venue.lat,
+    lng: venue.lng,
+    reports: reportsByVenue.get(venue.id) ?? [],
   }))
 }
