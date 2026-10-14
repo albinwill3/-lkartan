@@ -11,10 +11,15 @@ import type { Report } from "../data/reports"
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN as string
 
+const SOURCE_ID = "venues"
+const GLOW_LAYER = "venue-glow"
+const CIRCLES_LAYER = "venue-circles"
+const COUNTS_LAYER = "venue-counts"
+
 function getColor(price: number, volym: number): string {
-  const pricePerCl = price / volym
-  if (pricePerCl < 1.5) return "#3fb64b"
-  if (pricePerCl < 2.2) return "#e6c940"
+  const ppc = price / volym
+  if (ppc < 1.5) return "#3fb64b"
+  if (ppc < 2.2) return "#e6c940"
   return "#e04040"
 }
 
@@ -26,6 +31,24 @@ function groupColor(group: VenueGroup, voteTotals: Map<number, number>): string 
   }
   if (!top?.price || !top.volym) return "#888"
   return getColor(top.price, top.volym)
+}
+
+function buildGeoJSON(groups: VenueGroup[], voteTotals: Map<number, number>): GeoJSON.FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: groups.map((group) => ({
+      type: "Feature" as const,
+      geometry: { type: "Point" as const, coordinates: [group.lng, group.lat] },
+      properties: {
+        name: group.name,
+        key: group.key,
+        color: groupColor(group, voteTotals),
+        count: group.reports.length,
+        lat: group.lat,
+        lng: group.lng,
+      },
+    })),
+  }
 }
 
 export default function MapView({
@@ -61,55 +84,142 @@ export default function MapView({
 }) {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef(new Map<string, mapboxgl.Marker>())
   const tempMarkerRef = useRef<mapboxgl.Marker | null>(null)
-  const placingModeRef = useRef(placingMode)
+  const [mapReady, setMapReady] = useState(false)
+
+  // Refs to avoid stale closures in map event handlers
   const voteTotals = useMemo(() => {
     const totals = new Map<number, number>()
     for (const vote of votes) totals.set(vote.report_id, (totals.get(vote.report_id) ?? 0) + vote.value)
     return totals
   }, [votes])
+  const sourceData = useMemo(() => buildGeoJSON(venueGroups, voteTotals), [venueGroups, voteTotals])
+  const sourceDataRef = useRef(sourceData)
+  const placingModeRef = useRef(placingMode)
+  const setSelectedCoordsRef = useRef(setSelectedCoords)
+  const onMapClickRef = useRef(onMapClick)
+
+  useEffect(() => {
+    sourceDataRef.current = sourceData
+    placingModeRef.current = placingMode
+    setSelectedCoordsRef.current = setSelectedCoords
+    onMapClickRef.current = onMapClick
+  }, [sourceData, placingMode, setSelectedCoords, onMapClick])
 
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
   const selectedGroup = venueGroups.find((group) => group.key === selectedGroupKey) ?? null
   const [reviewReportId, setReviewReportId] = useState<number | null>(null)
   const [pendingCoords, setPendingCoords] = useState<{ lat: number; lng: number } | null>(null)
 
-
-  // Map init
+  // Map init — runs once
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/mapbox/dark-v11",
       center: [16.1826, 58.5877],
       zoom: 13,
     })
 
-    map.on("click", (e) => {
-      const target = e.originalEvent.target as HTMLElement
-      if (target.closest(".mapboxgl-marker")) return
-      const { lng, lat } = e.lngLat
-      setSelectedCoords({ lat, lng })
-      onMapClick()
+    map.on("load", () => {
+      map.addSource(SOURCE_ID, {
+        type: "geojson",
+        data: sourceDataRef.current,
+      })
+
+      // Glow halo behind circles
+      map.addLayer({
+        id: GLOW_LAYER,
+        type: "circle",
+        source: SOURCE_ID,
+        paint: {
+          "circle-radius": ["case", [">", ["get", "count"], 1], 22, 15],
+          "circle-color": ["get", "color"],
+          "circle-blur": 0.9,
+          "circle-opacity": 0.35,
+        },
+      })
+
+      // Main venue circles
+      map.addLayer({
+        id: CIRCLES_LAYER,
+        type: "circle",
+        source: SOURCE_ID,
+        paint: {
+          "circle-radius": ["case", [">", ["get", "count"], 1], 16, 11],
+          "circle-color": ["get", "color"],
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "rgba(255,255,255,0.9)",
+        },
+      })
+
+      // Count badge for grouped venues
+      map.addLayer({
+        id: COUNTS_LAYER,
+        type: "symbol",
+        source: SOURCE_ID,
+        filter: [">", ["get", "count"], 1],
+        layout: {
+          "text-field": ["to-string", ["get", "count"]],
+          "text-size": 11,
+          "text-font": ["DIN Offc Pro Bold", "Arial Unicode MS Bold"],
+        },
+        paint: {
+          "text-color": "#ffffff",
+          "text-halo-color": "rgba(0,0,0,0.5)",
+          "text-halo-width": 1,
+        },
+      })
+
+      // Pointer cursor on hover
+      map.on("mouseenter", CIRCLES_LAYER, () => {
+        if (!placingModeRef.current) map.getCanvas().style.cursor = "pointer"
+      })
+      map.on("mouseleave", CIRCLES_LAYER, () => {
+        if (!placingModeRef.current) map.getCanvas().style.cursor = ""
+      })
+
+      // Click on a venue circle
+      map.on("click", CIRCLES_LAYER, (e) => {
+        if (placingModeRef.current) return
+        const props = e.features?.[0]?.properties
+        if (!props) return
+        setSelectedGroupKey(String(props.key))
+        e.originalEvent.stopPropagation()
+      })
+
+      // Click on empty map
+      map.on("click", (e) => {
+        const hits = map.queryRenderedFeatures(e.point, { layers: [CIRCLES_LAYER] })
+        if (hits.length > 0) return
+        const { lng, lat } = e.lngLat
+        setSelectedCoordsRef.current({ lat, lng })
+        onMapClickRef.current()
+      })
+
+      setMapReady(true)
     })
 
     mapRef.current = map
 
     return () => {
-      markersRef.current.clear()
       map.remove()
       mapRef.current = null
     }
-  }, [setSelectedCoords])
+  }, [])
 
-  // Placing mode cursor + cleanup
+  // Update source data when venues/votes change
   useEffect(() => {
-    placingModeRef.current = placingMode
+    if (!mapReady || !mapRef.current) return
+    const src = mapRef.current.getSource(SOURCE_ID) as mapboxgl.GeoJSONSource | undefined
+    src?.setData(sourceData)
+  }, [sourceData, mapReady])
+
+  // Placing mode: cursor + cleanup
+  useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
     if (placingMode) {
       map.getCanvas().style.cursor = "crosshair"
       setSelectedGroupKey(null)
@@ -122,17 +232,16 @@ export default function MapView({
     }
   }, [placingMode])
 
-  // Click-to-place listener
+  // Placing mode click-to-place temp marker
   useEffect(() => {
     const map = mapRef.current
     if (!map || !placingMode) return
 
     const handlePlaceClick = (e: mapboxgl.MapMouseEvent) => {
-      const target = e.originalEvent.target as HTMLElement
-      if (target.closest(".mapboxgl-marker")) return
+      const hits = map.queryRenderedFeatures(e.point, { layers: [CIRCLES_LAYER] })
+      if (hits.length > 0) return
 
       const { lng, lat } = e.lngLat
-
       if (tempMarkerRef.current) { tempMarkerRef.current.remove(); tempMarkerRef.current = null }
 
       const el = document.createElement("div")
@@ -142,13 +251,12 @@ export default function MapView({
         transform: rotate(-45deg);
         background: #f5a623;
         border: 3px solid #fff;
-        box-shadow: 0 0 0 2px rgba(15,15,21,0.75), 0 3px 10px rgba(0,0,0,0.5);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
       `
-      const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      tempMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([lng, lat])
         .addTo(map)
 
-      tempMarkerRef.current = marker
       setPendingCoords({ lat, lng })
     }
 
@@ -156,80 +264,10 @@ export default function MapView({
     return () => { map.off("click", handlePlaceClick) }
   }, [placingMode])
 
-  // Render group markers
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const visibleKeys = new Set(venueGroups.map((group) => group.key))
-    for (const [key, marker] of markersRef.current) {
-      if (!visibleKeys.has(key)) {
-        marker.remove()
-        markersRef.current.delete(key)
-      }
-    }
-
-    venueGroups.forEach((group) => {
-      const color = groupColor(group, voteTotals)
-      const count = group.reports.length
-      const existing = markersRef.current.get(group.key)
-      if (existing) {
-        const el = existing.getElement()
-        if (el.dataset.color !== color) {
-          el.style.background = color
-          el.dataset.color = color
-        }
-        if (el.dataset.count !== String(count)) {
-          el.style.width = count > 1 ? "34px" : "28px"
-          el.style.height = el.style.width
-          el.textContent = count > 1 ? String(count) : ""
-          el.dataset.count = String(count)
-        }
-        const position = existing.getLngLat()
-        if (position.lng !== group.lng || position.lat !== group.lat) existing.setLngLat([group.lng, group.lat])
-        return
-      }
-
-      const el = document.createElement("div")
-      el.dataset.color = color
-      el.dataset.count = String(count)
-      el.style.cssText = `
-        width: ${count > 1 ? "34px" : "28px"};
-        height: ${count > 1 ? "34px" : "28px"};
-        border-radius: 50%;
-        background: ${color};
-        border: 3px solid #fff;
-        cursor: pointer;
-        box-shadow: 0 0 0 2px rgba(15,15,21,0.75), 0 3px 10px rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        font-weight: 800;
-        color: #0f0f15;
-        text-shadow: 0 1px 1px rgba(255,255,255,0.6);
-      `
-      if (count > 1) el.textContent = String(count)
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        if (placingModeRef.current) return
-        setSelectedGroupKey(group.key)
-      })
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([group.lng, group.lat])
-        .addTo(map)
-
-      markersRef.current.set(group.key, marker)
-    })
-  }, [venueGroups, voteTotals])
-
   return (
     <>
       <div ref={mapContainer} style={{ width: "100%", height: "100vh" }} />
 
-      {/* Placing mode banner */}
       {placingMode && (
         <div className="placing-banner">
           {pendingCoords ? (
@@ -262,7 +300,6 @@ export default function MapView({
         </div>
       )}
 
-      {/* Venue group panel */}
       {selectedGroup && !placingMode && (
         <VenueGroupPanel
           group={selectedGroup}
@@ -272,15 +309,9 @@ export default function MapView({
           onClose={() => setSelectedGroupKey(null)}
           onVoteChange={onVoteChange}
           onAddReview={setReviewReportId}
-          onEditReport={(report) => {
-            onEditReport(report)
-            setSelectedGroupKey(null)
-          }}
+          onEditReport={(report) => { onEditReport(report); setSelectedGroupKey(null) }}
           onReportDeleted={onReportDeleted}
-          onAddReport={() => {
-            onAddReport(selectedGroup.id)
-            setSelectedGroupKey(null)
-          }}
+          onAddReport={() => { onAddReport(selectedGroup.id); setSelectedGroupKey(null) }}
         />
       )}
 

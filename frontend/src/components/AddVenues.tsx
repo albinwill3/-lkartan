@@ -1,6 +1,10 @@
 import { useRef, useState } from "react"
 import { supabase } from "../lib/supabase"
-import { getTempLabel } from "../utils/temperature"
+import { initHoursGroups, buildOpeningHours } from "../utils/openingHours"
+import type { HoursGroup } from "../utils/openingHours"
+import OpeningHoursEditor from "./OpeningHoursEditor"
+import RangeSlider from "./RangeSlider"
+import TempSelector from "./TempSelector"
 import type { Venue } from "../data/venues"
 import type { Report } from "../data/reports"
 
@@ -23,6 +27,14 @@ export default function AddVenueForm({ selectedCoords, venue, reportToEdit, onVe
   const [saving, setSaving] = useState(false)
   const saveInFlight = useRef(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [showHours, setShowHours] = useState(false)
+  const [hoursGroups, setHoursGroups] = useState<HoursGroup[]>(initHoursGroups(reportToEdit?.opening_hours))
+  const [hoursChanged, setHoursChanged] = useState(false)
+
+  function updateHoursGroup(i: number, patch: Partial<HoursGroup>) {
+    setHoursChanged(true)
+    setHoursGroups((prev) => prev.map((g, idx) => (idx === i ? { ...g, ...patch } : g)))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -54,6 +66,7 @@ export default function AddVenueForm({ selectedCoords, venue, reportToEdit, onVe
       temperature,
       rating,
       user_id: userId,
+      opening_hours: reportToEdit && !hoursChanged ? reportToEdit.opening_hours ?? null : buildOpeningHours(hoursGroups),
     }
     saveInFlight.current = true
     setSaving(true)
@@ -138,25 +151,13 @@ export default function AddVenueForm({ selectedCoords, venue, reportToEdit, onVe
         />
 
         <div className="filter-group">
-          <label className="stat-label">Temperatur: {getTempLabel(temperature)}</label>
-          <input
-            type="range"
-            min="1"
-            max="4"
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-          />
+          <label className="stat-label">Temperatur</label>
+          <TempSelector value={temperature} onChange={setTemperature} />
         </div>
 
         <div className="filter-group">
           <label className="stat-label">Rating: {rating}/10</label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={rating}
-            onChange={(e) => setRating(Number(e.target.value))}
-          />
+          <RangeSlider min={1} max={10} step={1} value={rating} onChange={setRating} />
         </div>
 
         <label className="checkbox-field">
@@ -169,6 +170,13 @@ export default function AddVenueForm({ selectedCoords, venue, reportToEdit, onVe
           Guinness på tap
         </label>
 
+        <div className="filter-group">
+          <button type="button" className="hours-toggle-btn" onClick={() => setShowHours((value) => !value)}>
+            <span>Öppettider</span>
+            <span className={`expand-arrow ${showHours ? "open" : ""}`}>›</span>
+          </button>
+          {showHours && <OpeningHoursEditor groups={hoursGroups} onChange={updateHoursGroup} />}
+        </div>
         {errorMessage && <p role="alert" className="message error">{errorMessage}</p>}
         <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Sparar..." : reportToEdit ? "Spara ändringar" : "Spara"}</button>
         <button type="button" className="btn-ghost" onClick={onClose} disabled={saving}>Avbryt</button>

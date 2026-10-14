@@ -1,5 +1,10 @@
 # Venue identity migration
 
+Run `migrations/003_report_opening_hours.sql` after migrations 001 and 002.
+This adapts the opening-hours editor and open-now filter from the newer GitLab
+commits to the reports table. Existing opening-hours data is preserved and new
+bar creation saves opening hours along with the first report. Safe to rerun.
+
 For editing and deleting your own reports, also run
 `migrations/002_report_edit_and_delete.sql` after migration 001.
 It grants authenticated update/delete access under owner-only RLS and makes

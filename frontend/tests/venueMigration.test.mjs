@@ -7,6 +7,7 @@ const userId = '00000000-0000-0000-0000-000000000001'
 const otherUserId = '00000000-0000-0000-0000-000000000002'
 const migration = await readFile(new URL('../../supabase/migrations/001_separate_venues_and_reports.sql', import.meta.url), 'utf8')
 const editMigration = await readFile(new URL('../../supabase/migrations/002_report_edit_and_delete.sql', import.meta.url), 'utf8')
+const hoursMigration = await readFile(new URL('../../supabase/migrations/003_report_opening_hours.sql', import.meta.url), 'utf8')
 
 test('venue migration preserves links, supports shared reports, and enforces atomic authenticated creation', async () => {
   const db = new PGlite()
@@ -53,6 +54,8 @@ test('venue migration preserves links, supports shared reports, and enforces ato
     await db.exec(migration)
     await db.exec(editMigration)
     await db.exec(editMigration)
+    await db.exec(hoursMigration)
+    await db.exec(hoursMigration)
 
     const { rows: links } = await db.query(`
       SELECT r.id, r.venue_id, v.lat, r.created_at
@@ -77,9 +80,11 @@ test('venue migration preserves links, supports shared reports, and enforces ato
     await db.exec(`SET ROLE authenticated; SELECT set_config('request.jwt.claim.sub', '${userId}', false);`)
     const create = (rating = 5) => db.query(`
       SELECT public.create_venue_with_report($1, $2, $3, $4::jsonb) AS id
-    `, ['The Pub', 58.7, 16.3, JSON.stringify({ price: 65, volym: 40, temperature: 2, rating })])
+    `, ['The Pub', 58.7, 16.3, JSON.stringify({ price: 65, volym: 40, temperature: 2, rating, opening_hours: { fri: { open: '16:00', close: '23:00' } } })])
     const venueId = Number((await create()).rows[0].id)
     assert.ok(venueId > 2, 'new venue identity must not collide with migrated IDs')
+    const { rows: hours } = await db.query('SELECT opening_hours FROM public.reports WHERE venue_id = $1', [venueId])
+    assert.deepEqual(hours[0].opening_hours, { fri: { open: '16:00', close: '23:00' } })
     await db.query(`
       INSERT INTO public.reports (venue_id, price, volym, rating, user_id)
       VALUES ($1, 75, 40, 6, $2)

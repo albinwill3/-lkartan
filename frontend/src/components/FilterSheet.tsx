@@ -1,3 +1,5 @@
+import RangeSlider from "./RangeSlider"
+
 export default function FilterSheet({
     guinnessFilter,
     setGuinnessFilter,
@@ -17,6 +19,8 @@ export default function FilterSheet({
     setUseRatingFilter,
     minRating,
     setMinRating,
+    openNowFilter,
+    setOpenNowFilter,
 }: {
     guinnessFilter: "all" | "yes" | "no"
     setGuinnessFilter: (value: "all" | "yes" | "no") => void
@@ -36,10 +40,23 @@ export default function FilterSheet({
     setUseRatingFilter: (value: boolean) => void
     minRating: number
     setMinRating: (value: number) => void
+    openNowFilter: boolean
+    setOpenNowFilter: (value: boolean) => void
 }) {
     return (
         <div className="filter-sheet">
             <h2>Filter</h2>
+
+            <div className="filter-group">
+                <label className="filter-toggle">
+                    <input
+                        type="checkbox"
+                        checked={openNowFilter}
+                        onChange={(e) => setOpenNowFilter(e.target.checked)}
+                    />
+                    Visa bara öppna nu
+                </label>
+            </div>
 
             <div className="filter-group">
                 <label>Guinness</label>
@@ -66,13 +83,12 @@ export default function FilterSheet({
                 {usePriceOlFilter && (
                     <>
                         <span className="filter-value">Max: {maxPricePerOl} kr</span>
-                        <input
-                            type="range"
+                        <RangeSlider
                             min={cheapestPricePerOl}
                             max={mostExpensivePricePerOl}
-                            step="1"
+                            step={1}
                             value={maxPricePerOl}
-                            onChange={(e) => setMaxPricePerOl(Number(e.target.value))}
+                            onChange={setMaxPricePerOl}
                         />
                     </>
                 )}
@@ -90,13 +106,12 @@ export default function FilterSheet({
                 {usePriceFilter && (
                     <>
                         <span className="filter-value">Max: {maxPricePerCl.toFixed(2)} kr/cl</span>
-                        <input
-                            type="range"
+                        <RangeSlider
                             min={cheapestPricePerCl}
                             max={mostExpensivePricePerCl}
-                            step="0.01"
+                            step={0.01}
                             value={maxPricePerCl}
-                            onChange={(e) => setMaxPricePerCl(Number(e.target.value))}
+                            onChange={setMaxPricePerCl}
                         />
                     </>
                 )}
@@ -114,13 +129,12 @@ export default function FilterSheet({
                 {useRatingFilter && (
                     <>
                         <span className="filter-value">Min rating: {minRating}</span>
-                        <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            step="0.1"
+                        <RangeSlider
+                            min={1}
+                            max={10}
+                            step={0.1}
                             value={minRating}
-                            onChange={(e) => setMinRating(Number(e.target.value))}
+                            onChange={setMinRating}
                         />
                     </>
                 )}

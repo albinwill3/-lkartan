@@ -55,6 +55,7 @@ function renderComponent(file, server, props, select = (exports) => exports.defa
       if (name === 'react') return react
       if (name === '../lib/supabase') return { supabase: server }
       if (name === '../utils/temperature') return { getTempLabel: () => 'Kall' }
+      if (name === '../utils/openingHours') return require('../src/utils/openingHours.ts')
       if (name === 'mapbox-gl') return { __esModule: true, default: server.mapbox }
       if (name.endsWith('.css')) return {}
       if (name.startsWith('./')) return loadComponent(`${name.slice(2)}.tsx`)
@@ -74,23 +75,22 @@ function renderComponent(file, server, props, select = (exports) => exports.defa
   }
 }
 
-test('map keeps marker instances across panel renders, votes, and filter changes', () => {
-  const markers = []
+test('map keeps its source and layers across panel renders, votes, and filter changes', () => {
+  const maps = []
+  const sources = []
+  const layers = []
+  const updates = []
   const server = {
     document: { createElement: () => ({ style: {}, dataset: {}, addEventListener() {} }) },
     mapbox: {
       Map: class {
-        on() {}
+        constructor() { this.handlers = {}; maps.push(this) }
+        on(event, layer, handler) { this.handlers[handler ? `${event}:${layer}` : event] = handler ?? layer }
         off() {}
         getCanvas() { return { style: {} } }
-      },
-      Marker: class {
-        constructor({ element }) { this.element = element; markers.push(this) }
-        setLngLat([lng, lat]) { this.position = { lng, lat }; return this }
-        getLngLat() { return this.position }
-        getElement() { return this.element }
-        addTo() { return this }
-        remove() { this.removed = true }
+        addSource(id, source) { sources.push({ id, source }) }
+        addLayer(layer) { layers.push(layer) }
+        getSource() { return { setData: (data) => updates.push(data) } }
       },
     },
   }
@@ -104,20 +104,22 @@ test('map keeps marker instances across panel renders, votes, and filter changes
   }
   const render = renderComponent('MapView.tsx', server, props)
   render()
-  assert.equal(markers.length, 2)
+  maps[0].handlers.load()
   render()
-  assert.equal(markers.length, 2, 'an unrelated rerender must not recreate markers')
+  const beforePanel = updates.length
+  render()
+  assert.equal(updates.length, beforePanel, 'an unrelated rerender must not update the map source')
   props.votes = [{ report_id: 11, value: 1 }]
   render()
-  assert.equal(markers.length, 2, 'voting must update the existing marker')
-  assert.equal(markers[0].element.style.background, '#e04040')
+  assert.equal(updates.at(-1).features[0].properties.color, '#e04040')
   props.venueGroups = [{ ...first, reports: [first.reports[0]] }]
   render()
-  assert.equal(markers.length, 2, 'filtering must retain visible markers')
-  assert.equal(markers[0].removed, undefined)
-  assert.equal(markers[1].removed, true)
-  assert.equal(markers[0].element.style.background, '#3fb64b')
-  assert.equal(markers[0].element.style.width, '28px')
+  assert.equal(maps.length, 1)
+  assert.equal(sources.length, 1)
+  assert.equal(layers.length, 3)
+  assert.equal(updates.at(-1).features.length, 1)
+  assert.equal(updates.at(-1).features[0].properties.color, '#3fb64b')
+  assert.equal(updates.at(-1).features[0].properties.key, '1')
 })
 
 test('report actions are hidden for visitors and other users', () => {

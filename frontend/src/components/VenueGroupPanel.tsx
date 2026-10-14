@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase"
 import { getTempLabel } from "../utils/temperature"
 import type { Report } from "../data/reports"
 import ReportActions from "./ReportActions"
+import { isOpenNow } from "../utils/openingHours"
 
 function netVotes(reportId: number, votes: Vote[]): number {
   return votes.filter((v) => v.report_id === reportId).reduce((s, v) => s + v.value, 0)
@@ -47,6 +48,7 @@ function SubmissionCard({
   const [showReviews, setShowReviews] = useState(false)
 
   const reportReviews = reviews.filter((r) => r.report_id === report.id)
+  const openStatus = isOpenNow(report.opening_hours)
 
   async function handleVote(value: 1 | -1) {
     if (!user || isOwnPost || voteInFlight.current) return
@@ -94,6 +96,11 @@ function SubmissionCard({
               </span>
             </span>
           ) : <span className="submission-price">Pris okänt</span>}
+          {openStatus !== null && (
+            <span className={openStatus ? "open-badge" : "closed-badge"}>
+              {openStatus ? "Öppet nu" : "Stängt"}
+            </span>
+          )}
         </div>
         <div className="vote-controls" aria-busy={voting}>
           <button

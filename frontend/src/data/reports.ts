@@ -1,3 +1,5 @@
+import type { OpeningHours } from "./venues"
+
 export type Report = {
   id: number
   venue_id: number
@@ -10,4 +12,5 @@ export type Report = {
   rating: number
   user_id: string | null
   created_at: string | null
+  opening_hours?: OpeningHours | null
 }

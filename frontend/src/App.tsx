@@ -11,6 +11,7 @@ import './App.css'
 import FilterSheet from "./components/FilterSheet"
 import ProfileSheet from "./components/ProfileSheet"
 import { groupVenues } from "./utils/groupVenues"
+import { isOpenNow } from "./utils/openingHours"
 
 function App() {
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(null)
@@ -32,6 +33,7 @@ function App() {
   const [usePriceFilter, setUsePriceFilter] = useState(false)
   const [useRatingFilter, setUseRatingFilter] = useState(false)
   const [minRating, setMinRating] = useState(1)
+  const [openNowFilter, setOpenNowFilter] = useState(false)
 
   async function fetchVenues() {
     const [venueResult, reportResult] = await Promise.all([
@@ -189,10 +191,11 @@ function App() {
       matchesRating = avg !== null && avg >= minRating
     }
 
-    return matchesGuinness && matchesPrice && matchesRating && matchesOlPrice
-  }), [reports, reviewRatings, guinnessFilter, usePriceOlFilter, maxPricePerOl, usePriceFilter, maxPricePerCl, useRatingFilter, minRating])
+    const matchesOpenNow = !openNowFilter || isOpenNow(venue.opening_hours) === true
+    return matchesGuinness && matchesPrice && matchesRating && matchesOlPrice && matchesOpenNow
+  }), [reports, reviewRatings, guinnessFilter, usePriceOlFilter, maxPricePerOl, usePriceFilter, maxPricePerCl, useRatingFilter, minRating, openNowFilter])
 
-  const hasFilters = guinnessFilter !== "all" || usePriceOlFilter || usePriceFilter || useRatingFilter
+  const hasFilters = guinnessFilter !== "all" || usePriceOlFilter || usePriceFilter || useRatingFilter || openNowFilter
   const venueGroups = useMemo(() => groupVenues(venues, filteredReports)
     .filter((group) => !hasFilters || group.reports.length > 0), [venues, filteredReports, hasFilters])
 
@@ -223,12 +226,21 @@ function App() {
         }}
       />
 
-      <div className="map-legend">
-        <span className="legend-title">Prisklasser</span>
-        <div className="legend-row"><span className="legend-dot green" />Billigt</div>
-        <div className="legend-row"><span className="legend-dot yellow" />Medel</div>
-        <div className="legend-row"><span className="legend-dot red" />Dyrt</div>
-      </div>
+      <details className="map-legend">
+        <summary className="map-legend-summary">
+          <div className="legend-dots-row">
+            <span className="legend-dot green" />
+            <span className="legend-dot yellow" />
+            <span className="legend-dot red" />
+          </div>
+          <span className="legend-expand-hint">Prisklasser</span>
+        </summary>
+        <div className="legend-items">
+          <div className="legend-row"><span className="legend-dot green" />Billigt</div>
+          <div className="legend-row"><span className="legend-dot yellow" />Medel</div>
+          <div className="legend-row"><span className="legend-dot red" />Dyrt</div>
+        </div>
+      </details>
 
       <div className="top-bubble">
         <h1>Ölkartan</h1>
@@ -312,6 +324,8 @@ function App() {
           setUseRatingFilter={setUseRatingFilter}
           minRating={minRating}
           setMinRating={setMinRating}
+          openNowFilter={openNowFilter}
+          setOpenNowFilter={setOpenNowFilter}
         />
       )}
     </div>
